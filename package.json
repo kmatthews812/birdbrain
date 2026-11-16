@@ -7,12 +7,15 @@
   },
   "scripts": {
     "build": "next build",
-    "test": "node --test tests/detections.test.mjs",
+    "test": "node --import tsx --test tests/*.test.mjs tests/*.test.jsx",
     "start": "next start"
   },
   "dependencies": {
     "next": "16.4.6",
     "react": "19.3.1",
     "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15"
   }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { readDetection, shouldReload } from '../lib/detections.mjs';
 
 export default function Board({ version }) {
@@ -44,7 +44,13 @@ export default function Board({ version }) {
 
   return (
     <main>
-      <header><h1>BirdBrain</h1><p><i data-online={online} />{online ? 'Live' : 'Connecting'}</p></header>
+      <header>
+        <div className="brand">
+          <img src="/birdbrain.png" alt="BirdBrain mascot with a popped-open brain" width="64" height="64" />
+          <h1>BirdBrain</h1>
+        </div>
+        <p><i data-online={online} />{online ? 'Live' : 'Connecting'}</p>
+      </header>
       <section aria-live="polite">
         <div className="rings" key={sequence} data-detected={Boolean(bird)} aria-hidden="true" />
         <div className="caption">
