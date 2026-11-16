@@ -12,9 +12,11 @@ $root = 'C:\ProgramData\BirdBrain'
 $npm = Join-Path (Split-Path $Node) 'npm.cmd'
 $account = New-Object Security.Principal.NTAccount($DeployUser)
 $sid = $account.Translate([Security.Principal.SecurityIdentifier])
-$nodeVersion = if (Test-Path -LiteralPath $Node) { & $Node --version }
-if (-not (Test-Path -LiteralPath $Git) -or -not (Test-Path -LiteralPath $npm) -or $nodeVersion -notmatch '^v24\.') {
-    throw 'Install machine-wide Git for Windows and Node.js 24 LTS, then retry.'
+$nodeMajor = if (Test-Path -LiteralPath $Node) {
+    & $Node -p 'process.release.lts && parseInt(process.versions.node, 10)'
+}
+if (-not (Test-Path -LiteralPath $Git) -or -not (Test-Path -LiteralPath $npm) -or $nodeMajor -notin @('24', '26')) {
+    throw 'Install machine-wide Git for Windows and Node.js 24 or 26 LTS, then retry.'
 }
 
 $env:GIT_TERMINAL_PROMPT = '0'

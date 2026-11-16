@@ -7,7 +7,7 @@ again when Safari becomes visible.
 
 ## Windows host
 
-1. Install Git for Windows and the x64 Node.js 24 LTS MSI system-wide. The installer
+1. Install Git for Windows and the x64 Node.js 24 or 26 LTS MSI system-wide. The installer
    defaults to `C:\Program Files\Git\cmd\git.exe` and
    `C:\Program Files\nodejs\node.exe`.
 2. Push the app and lockfile to [birdbrain/main](https://github.com/kmatthews812/birdbrain/tree/main).
