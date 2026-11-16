@@ -8,7 +8,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $remote = 'https://github.com/kmatthews812/birdbrain.git'
 $branch = 'main'
-$root = 'C:\ProgramData\Birdwatch'
+$root = 'C:\ProgramData\BirdBrain'
 $npm = Join-Path (Split-Path $Node) 'npm.cmd'
 $account = New-Object Security.Principal.NTAccount($DeployUser)
 $sid = $account.Translate([Security.Principal.SecurityIdentifier])
@@ -23,8 +23,8 @@ $head = & $Git ls-remote --exit-code $remote "refs/heads/$branch"
 if ($LASTEXITCODE -ne 0 -or -not $head) { throw 'Could not read birdbrain/main.' }
 $commit = ($head -split '\s+')[0]
 $manifest = Invoke-RestMethod -Uri "https://raw.githubusercontent.com/kmatthews812/birdbrain/$commit/package.json"
-if ($manifest.name -ne 'bird-visualizer' -or -not $manifest.scripts.build -or -not $manifest.scripts.test) {
-    throw 'Push the Birdwatch app commits to birdbrain/main before installing.'
+if ($manifest.name -ne 'birdbrain' -or -not $manifest.scripts.build -or -not $manifest.scripts.test) {
+    throw 'Push the BirdBrain app commits to birdbrain/main before installing.'
 }
 
 function Invoke-Checked($Executable, [string[]]$Arguments) {
@@ -35,7 +35,7 @@ function Invoke-Checked($Executable, [string[]]$Arguments) {
 if (-not (Test-Path -LiteralPath $root)) {
     New-Item -Path $root -ItemType Directory | Out-Null
 } elseif (-not (Test-Path -LiteralPath (Join-Path $root 'host.json'))) {
-    throw "Installation directory already exists without Birdwatch configuration: $root"
+    throw "Installation directory already exists without BirdBrain configuration: $root"
 }
 Invoke-Checked icacls.exe @($root, '/inheritance:r', '/grant:r',
     '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F', '*S-1-5-19:(OI)(CI)RX',
@@ -49,12 +49,12 @@ Invoke-Checked icacls.exe @($serviceLogs, '/grant:r', '*S-1-5-19:(OI)(CI)M')
 Copy-Item -LiteralPath @(
     (Join-Path $PSScriptRoot 'Deploy.ps1'),
     (Join-Path $PSScriptRoot 'ReleaseState.ps1'),
-    (Join-Path $PSScriptRoot 'Start-Birdwatch.mjs')
+    (Join-Path $PSScriptRoot 'Start-BirdBrain.mjs')
 ) -Destination $root -Force
 @{ git = $Git; node = $Node; npm = $npm; remote = $remote; branch = $branch } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $root 'host.json') -Encoding UTF8
 
-$wrapper = Join-Path $root 'Birdwatch.exe'
+$wrapper = Join-Path $root 'BirdBrain.exe'
 $checksum = '286c5e550c606593d249bb70599be5c9013573acb290693c3717da690bab8574'
 if (-not (Test-Path -LiteralPath $wrapper) -or (Get-FileHash -LiteralPath $wrapper).Hash -ne $checksum) {
     $download = Join-Path $root 'WinSW.download'
@@ -68,11 +68,11 @@ if (-not (Test-Path -LiteralPath $wrapper) -or (Get-FileHash -LiteralPath $wrapp
 $nodeXml = [Security.SecurityElement]::Escape($Node)
 @"
 <service>
-  <id>Birdwatch</id>
-  <name>Birdwatch</name>
+  <id>BirdBrain</id>
+  <name>BirdBrain</name>
   <description>Birdbrain Next.js visualization for the local network</description>
   <executable>$nodeXml</executable>
-  <arguments>"%BASE%\Start-Birdwatch.mjs" "%BASE%"</arguments>
+  <arguments>"%BASE%\Start-BirdBrain.mjs" "%BASE%"</arguments>
   <workingdirectory>%BASE%</workingdirectory>
   <env name="NODE_ENV" value="production"/>
   <env name="NEXT_TELEMETRY_DISABLED" value="1"/>
@@ -86,20 +86,20 @@ $nodeXml = [Security.SecurityElement]::Escape($Node)
   <logpath>%BASE%\service-logs</logpath>
   <log mode="roll-by-size"><sizeThreshold>10240</sizeThreshold><keepFiles>4</keepFiles></log>
 </service>
-"@ | Set-Content -LiteralPath (Join-Path $root 'Birdwatch.xml') -Encoding UTF8
+"@ | Set-Content -LiteralPath (Join-Path $root 'BirdBrain.xml') -Encoding UTF8
 
-if (-not (Get-Service -Name Birdwatch -ErrorAction SilentlyContinue)) {
+if (-not (Get-Service -Name BirdBrain -ErrorAction SilentlyContinue)) {
     Invoke-Checked $wrapper @('install')
 }
-$descriptor = (& sc.exe sdshow Birdwatch | Where-Object { $_ -match '^D:' } | Select-Object -First 1)
-if ($LASTEXITCODE -ne 0 -or -not $descriptor) { throw 'Could not read Birdwatch service permissions.' }
+$descriptor = (& sc.exe sdshow BirdBrain | Where-Object { $_ -match '^D:' } | Select-Object -First 1)
+if ($LASTEXITCODE -ne 0 -or -not $descriptor) { throw 'Could not read BirdBrain service permissions.' }
 $security = New-Object Security.AccessControl.CommonSecurityDescriptor($false, $false, $descriptor)
 # Delegate only query status, start, and stop on this single service.
 $security.DiscretionaryAcl.SetAccess('Allow', $sid, 0x34, 'None', 'None')
-Invoke-Checked sc.exe @('sdset', 'Birdwatch', $security.GetSddlForm('All'))
+Invoke-Checked sc.exe @('sdset', 'BirdBrain', $security.GetSddlForm('All'))
 
-if (-not (Get-NetFirewallRule -Name 'Birdwatch-Private-LAN' -ErrorAction SilentlyContinue)) {
-    New-NetFirewallRule -Name 'Birdwatch-Private-LAN' -DisplayName 'Birdwatch on private LAN' `
+if (-not (Get-NetFirewallRule -Name 'BirdBrain-Private-LAN' -ErrorAction SilentlyContinue)) {
+    New-NetFirewallRule -Name 'BirdBrain-Private-LAN' -DisplayName 'BirdBrain on private LAN' `
         -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3000 -Profile Private `
         -RemoteAddress LocalSubnet -Program $Node | Out-Null
 }
@@ -137,10 +137,10 @@ $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $credential = Get-Credential -UserName $DeployUser -Message 'Enter your Windows account password to run deployments while signed out.'
 if (-not $credential -or $credential.UserName -ne $DeployUser) { throw "Use account $DeployUser." }
 try {
-    Register-ScheduledTask -TaskName 'Birdwatch Deploy' -Xml $taskXml -User $DeployUser `
+    Register-ScheduledTask -TaskName 'BirdBrain Deploy' -Xml $taskXml -User $DeployUser `
         -Password $credential.GetNetworkCredential().Password -Force | Out-Null
 } finally {
     Remove-Variable credential
 }
-Start-ScheduledTask -TaskName 'Birdwatch Deploy'
+Start-ScheduledTask -TaskName 'BirdBrain Deploy'
 Write-Host "Initial deployment started. Logs: $data\deploy-*.log"

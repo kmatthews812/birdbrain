@@ -33,17 +33,17 @@ function Invoke-Step($Executable, [string[]]$Arguments) {
 }
 
 function Stop-App {
-    $service = Get-Service -Name Birdwatch
+    $service = Get-Service -Name BirdBrain
     if ($service.Status -ne 'Stopped') {
-        & sc.exe stop Birdwatch | Out-Null
-        if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 1062) { throw 'Could not stop Birdwatch.' }
+        & sc.exe stop BirdBrain | Out-Null
+        if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 1062) { throw 'Could not stop BirdBrain.' }
         $service.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
     }
 }
 
 function Start-App($Commit) {
-    & sc.exe start Birdwatch | Out-Null
-    if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 1056) { throw 'Could not start Birdwatch.' }
+    & sc.exe start BirdBrain | Out-Null
+    if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 1056) { throw 'Could not start BirdBrain.' }
     $until = (Get-Date).AddSeconds(45)
     do {
         try {
@@ -74,7 +74,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Could not resolve the fetched branch.' }
     Assert-ReleaseCommit $commit
     if ($state.good -eq $commit) {
-        if ((Get-Service -Name Birdwatch).Status -eq 'Stopped') { Start-App $commit }
+        if ((Get-Service -Name BirdBrain).Status -eq 'Stopped') { Start-App $commit }
         return
     }
 

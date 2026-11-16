@@ -1,6 +1,6 @@
-# birdbrain
+# BirdBrain
 
-Birdwatch displays live BirdNET-Go detections on an iPad. Its Next.js server relays
+BirdBrain displays live BirdNET-Go detections on an iPad. Its Next.js server relays
 the BirdNET-Go detection stream over SSE and uses the active Git commit as the
 version. The display checks for a new version every 10 seconds while open and
 again when Safari becomes visible.
@@ -15,12 +15,13 @@ again when Safari becomes visible.
 3. In an administrator PowerShell on the BirdNET-Go PC, from this checkout run:
 
    ```powershell
+   Set-Location (Join-Path $env:USERPROFILE 'Code\birdbrain')
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\deploy\Install-Host.ps1
    ```
 
    The installer downloads and checks the pinned WinSW executable, creates the
-   automatic Birdwatch service and private-LAN port 3000 rule, then registers
-   Birdwatch Deploy. Enter your Windows password in the local credential prompt.
+   automatic BirdBrain service and private-LAN port 3000 rule, then registers
+   BirdBrain Deploy. Enter your Windows password in the local credential prompt.
    The task runs as that Windows account at limited privileges, including while
    signed out. The application service runs as LocalService.
 
@@ -39,10 +40,10 @@ release directory. During the switch the service briefly restarts, and
 running. A failed health check restores the previous release. The task also
 recovers an interrupted switch before staging another release.
 
-- Task Scheduler Library → **Birdwatch Deploy**
-- Services → **Birdwatch**
-- Deploy logs in `C:\ProgramData\Birdwatch\data\deploy-YYYY-MM-DD.log`
-- WinSW logs in `C:\ProgramData\Birdwatch\service-logs`
+- Task Scheduler Library → **BirdBrain Deploy**
+- Services → **BirdBrain**
+- Deploy logs in `C:\ProgramData\BirdBrain\data\deploy-YYYY-MM-DD.log`
+- WinSW logs in `C:\ProgramData\BirdBrain\service-logs`
 
 Changes to the Windows host scripts take effect when the administrator reruns
 the installer. The deployed branch controls the app, and the Windows task runs

@@ -44,7 +44,7 @@ export default function Board({ version }) {
 
   return (
     <main>
-      <header><h1>Birdwatch</h1><p><i data-online={online} />{online ? 'Live' : 'Connecting'}</p></header>
+      <header><h1>BirdBrain</h1><p><i data-online={online} />{online ? 'Live' : 'Connecting'}</p></header>
       <section aria-live="polite">
         <div className="rings" key={sequence} data-detected={Boolean(bird)} aria-hidden="true" />
         <div className="caption">
