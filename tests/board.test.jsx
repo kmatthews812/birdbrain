@@ -4,6 +4,11 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import Board from '../app/board.jsx';
 
+test('shows Listening for owls while waiting for a detection', () => {
+  const html = renderToStaticMarkup(<Board version="test" />);
+  assert.equal(html.match(/<h2>(.*?)<\/h2>/s)?.[1], 'Listening for owls');
+});
+
 test('renders the BirdBrain mascot beside the title before the connection status', () => {
   const html = renderToStaticMarkup(<Board version="test" />);
   assert.equal(html.match(/<header>(.*?)<\/header>/s)?.[1],

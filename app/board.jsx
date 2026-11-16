@@ -54,7 +54,7 @@ export default function Board({ version }) {
       <section aria-live="polite">
         <div className="rings" key={sequence} data-detected={Boolean(bird)} aria-hidden="true" />
         <div className="caption">
-          <h2>{bird ? bird.commonName : 'Listening for birds'}</h2>
+          <h2>{bird ? bird.commonName : 'Listening for owls'}</h2>
           {bird && <p>{Math.round(bird.confidence * 100)}% confidence</p>}
         </div>
       </section>
