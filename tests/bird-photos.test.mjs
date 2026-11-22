@@ -58,3 +58,16 @@ test('aborts an abandoned lookup without caching or starting fallback work', asy
   assert.equal((await pending).status, 499);
   assert.equal(calls, 1);
 });
+test('simultaneous cold requests share a candidate lookup and select different photos', async () => {
+  const calls = [];
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const fetcher = upstream([photo(1), photo(2)], calls);
+  const handle = createBirdPhotoHandler({ fetch: async url => { await gate; return fetcher(url); }, random: () => 0 });
+  const first = handle(request());
+  const second = handle(request());
+  release();
+  const results = await Promise.all([first, second]);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(await Promise.all(results.map(async response => (await response.json()).url)), ['https://inaturalist-open-data.s3.amazonaws.com/photos/1/large.jpg', 'https://inaturalist-open-data.s3.amazonaws.com/photos/2/large.jpg']);
+});
