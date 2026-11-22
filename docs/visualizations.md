@@ -3,9 +3,18 @@
 A visualization is a React component plus a registry entry. The framework selects
 one at random for each new BirdNET-Go detection, avoiding the previous choice
 when more than one is registered. It passes the entire validated detection as
-`bird`, a `tools` object, and an `AbortSignal` named `signal`. **Default View**,
+`bird`, the preceding bird as `previousBird` (or `null` for the first bird), a
+`tools` object, and an `AbortSignal` named `signal`. **Default View**,
 created by Kevin, shows a BirdNET-Go photo and a sourced fun fact. Family creations
 can be added independently.
+
+**Celebrity Death Match**, also by Kevin, generates a playful claymation fight GIF
+with OpenAI using the current and preceding birds. It waits for an opponent on
+the first detection. To stage a manual matchup, preview one bird, select Celebrity
+Death Match with Randomize unchecked, then preview the second bird. Live events
+received during previews still update the preceding bird for the next matchup.
+The matchup lasts up to three minutes including generation; new live detections
+can replace it. Each matchup generates a new GIF and incurs an image API charge.
 
 The upper-right selector chooses a specific visualization when **Randomize** is
 unchecked. Randomize is checked by default. Choose a previously seen species and

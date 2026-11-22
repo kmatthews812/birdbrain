@@ -47,3 +47,9 @@ button:disabled { opacity: .5; cursor: default; }
 .scientific-name { font-style: italic; color: #bbd7d1; }
 .fun-fact { font-size: clamp(1.15rem, 2.4vw, 1.6rem); line-height: 1.5; }
 @media (max-width: 680px) { .default-view { grid-template-columns: 1fr; } .bird-photo, .photo-placeholder { max-height: 35vh; } }
+.death-match { width: 100%; max-width: 1000px; padding: 1rem 0 3rem; }
+.death-match .eyebrow { color: #ffbe85; }
+.death-match h2 { font-size: clamp(2rem, 4vw, 3.5rem); margin-bottom: 1.5rem; }
+.match-gif, .match-arena { display: block; width: 100%; max-height: 55vh; min-height: 12rem; aspect-ratio: 16 / 9; object-fit: contain; border-radius: 1.5rem; background: #101d21; border: 2px solid #b66b4b; }
+.match-arena { display: grid; place-items: center; padding: 2rem; background: radial-gradient(ellipse at center, #593c39, #101d21 75%); }
+.match-status { font-size: clamp(1.1rem, 2.5vw, 1.5rem); color: #f2d1b9; }

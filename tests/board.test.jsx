@@ -9,6 +9,7 @@ import { visualizations } from '../visualizations/index.jsx';
 
 const robin = { id: 42, commonName: 'Robin', scientificName: 'Turdus migratorius', confidence: 0.9 };
 async function mountBoard(t, fetcher = async (url) => Response.json(url === '/api/birds/history' ? { birds: [] } : { version: 'test' })) {
+  t.mock.method(Math, 'random', () => 0);
   const dom = new JSDOM('<div id="root"></div>');
   globalThis.window = dom.window;
   globalThis.document = dom.window.document;
