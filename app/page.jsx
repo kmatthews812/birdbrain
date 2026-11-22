@@ -1,7 +1,8 @@
 import Board from './board';
+import { readAppVersion } from '../lib/version.mjs';
 
 export const dynamic = 'force-dynamic';
 
 export default function Page() {
-  return <Board version={process.env.BIRD_APP_VERSION || 'development'} />;
+  return <Board version={readAppVersion()} />;
 }
