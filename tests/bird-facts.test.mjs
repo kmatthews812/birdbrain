@@ -160,3 +160,14 @@ test('cancels upstream when its last subscriber leaves and allows a fresh retry'
   assert.equal((await handle(request())).status, 200);
   assert.equal(calls, 2);
 });
+
+test('removes parenthesized Markdown source citations while preserving parenthetical prose and source links', async () => {
+  const handle = createBirdFactHandler({ env: { OPENAI_API_KEY: 'test' }, fetch: async () => Response.json(result(
+    'Young crows (including older siblings) help their parents. ([Crow research](https://example.org/crows?utm_source=openai)) They bring food (such as insects).',
+  )) });
+  const response = await handle(request());
+  assert.deepEqual(await response.json(), {
+    fact: 'Young crows (including older siblings) help their parents. They bring food (such as insects).',
+    sources: [{ title: 'Crow research', url: 'https://example.org/crows' }],
+  });
+});
