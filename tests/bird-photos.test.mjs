@@ -71,3 +71,30 @@ test('simultaneous cold requests share a candidate lookup and select different p
   assert.equal(calls.length, 2);
   assert.deepEqual(await Promise.all(results.map(async response => (await response.json()).url)), ['https://inaturalist-open-data.s3.amazonaws.com/photos/1/large.jpg', 'https://inaturalist-open-data.s3.amazonaws.com/photos/2/large.jpg']);
 });
+
+test('shows every available photo before repeating and avoids a repeat at the cycle boundary', async () => {
+  const randomValues = [.9, .9, 0, 0, 0, 0, 0];
+  const handle = createBirdPhotoHandler({ fetch: upstream([photo(1), photo(2), photo(3)], []), random: () => randomValues.shift() });
+  const urls = [];
+  for (let index = 0; index < 7; index++) urls.push((await (await handle(request())).json()).url);
+  assert.deepEqual(urls, [3, 2, 1, 2, 1, 3, 1].map(id => photo(id).photo.large_url));
+});
+
+test('preserves the used-photo cycle when the candidate cache refreshes and new photos arrive', async () => {
+  let now = 0;
+  const photos = [photo(1), photo(2), photo(3)];
+  const handle = createBirdPhotoHandler({ fetch: upstream(photos, []), random: () => 0, now: () => now });
+  const urls = [(await (await handle(request())).json()).url];
+  now = 3600001;
+  photos.push(photo(4));
+  for (let index = 0; index < 3; index++) urls.push((await (await handle(request())).json()).url);
+  assert.deepEqual(urls, [1, 2, 3, 4].map(id => photo(id).photo.large_url));
+});
+
+test('concurrent queued requests consume distinct photos throughout the available pool', async () => {
+  const calls = [];
+  const handle = createBirdPhotoHandler({ fetch: upstream([photo(1), photo(2), photo(3)], calls), random: () => 0 });
+  const results = await Promise.all([handle(request()), handle(request()), handle(request())]);
+  assert.deepEqual(await Promise.all(results.map(async response => (await response.json()).url)), [1, 2, 3].map(id => photo(id).photo.large_url));
+  assert.equal(calls.length, 2);
+});
