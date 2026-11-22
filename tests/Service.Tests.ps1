@@ -21,9 +21,10 @@ function Reset-Fixture {
     $script:processes = @()
     $script:listeners = @()
     $script:version = $commit
+    $script:serviceProcessId = 5
 }
-function New-Node($Id, $CommandLine) {
-    [pscustomobject]@{ ProcessId = $Id; Name = 'node.exe'; CommandLine = $CommandLine }
+function New-Node($Id, $CommandLine, $ParentId = 0) {
+    [pscustomobject]@{ ProcessId = $Id; ParentProcessId = $ParentId; Name = 'node.exe'; CommandLine = $CommandLine }
 }
 function Get-Service {
     param($Name)
@@ -46,6 +47,10 @@ function sc.exe {
 }
 function Get-CimInstance {
     param($ClassName, $Filter)
+    if ($ClassName -eq 'Win32_Service') {
+        Assert-Equal $Filter "Name = 'BirdBrain'" 'Wrong service process query'
+        return [pscustomobject]@{ ProcessId = $script:serviceProcessId }
+    }
     Assert-Equal $ClassName 'Win32_Process' 'Wrong process query'
     $script:processes
 }
@@ -96,8 +101,8 @@ Assert-Equal @($script:processes.ProcessId) @(20) 'Unrelated server remains unto
 Reset-Fixture
 $script:status = 'Stopped'
 $script:processes = @(
-    (New-Node 10 'node.exe C:\ProgramData\BirdBrain\Start-BirdBrain.mjs'),
-    (New-Node 11 'node.exe C:\ProgramData\BirdBrain\data\app\node_modules\next\dist\bin\next start')
+    (New-Node 10 'node.exe C:\ProgramData\BirdBrain\Start-BirdBrain.mjs' 5),
+    (New-Node 11 'node.exe C:\ProgramData\BirdBrain\data\app\node_modules\next\dist\bin\next start' 10)
 )
 $script:listeners = @([pscustomobject]@{ LocalPort = 3000; OwningProcess = 11 }, [pscustomobject]@{ LocalPort = 3000; OwningProcess = 11 })
 Start-BirdBrain -Root $root -Commit $commit
@@ -109,8 +114,26 @@ Assert-Throws { Start-BirdBrain -Root $root -Commit $commit } '*exactly one Bird
 Assert-Equal @($script:events) @('service:start') 'Duplicate detection must not start another service'
 
 Reset-Fixture
-$script:processes = @((New-Node 11 'node.exe C:\ProgramData\BirdBrain\data\app\node_modules\next\dist\bin\next start'))
+$script:processes = @((New-Node 11 'node.exe C:\ProgramData\BirdBrain\data\app\node_modules\next\dist\bin\next start' 10))
 $script:listeners = @([pscustomobject]@{ LocalPort = 3000; OwningProcess = 20 })
 Assert-Throws { Start-BirdBrain -Root $root -Commit $commit } '*exactly one BirdBrain Next server*'
+
+Reset-Fixture
+$script:processes = @((New-Node 10 $null 5), (New-Node 11 $null 10), (New-Node 20 $null 999))
+$script:listeners = @([pscustomobject]@{ LocalPort = 3000; OwningProcess = 11 })
+Start-BirdBrain -Root $root -Commit $commit
+Assert-Equal @($script:events) @() 'A healthy LocalService tree must verify without readable command lines'
+
+$script:processes += New-Node 12 $null 10
+Assert-Throws { Start-BirdBrain -Root $root -Commit $commit } '*exactly one BirdBrain Next server*'
+
+Reset-Fixture
+$script:processes = @((New-Node 10 $null 5), (New-Node 11 $null 10), (New-Node 20 $null 999))
+$script:listeners = @([pscustomobject]@{ LocalPort = 3000; OwningProcess = 20 })
+Assert-Throws { Start-BirdBrain -Root $root -Commit $commit } '*exactly one BirdBrain Next server*'
+
+$script:status = 'Stopped'
+Assert-Throws { Stop-BirdBrain -Root $root } '*Port 3000*'
+Assert-Equal @($script:events) @() 'Unknown process identities must never be killed'
 
 Write-Host 'Service lifecycle tests passed.'

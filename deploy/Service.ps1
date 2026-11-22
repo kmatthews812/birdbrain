@@ -49,12 +49,22 @@ function Start-BirdBrain($Root, $Commit) {
         try { $result = Invoke-RestMethod -Uri 'http://127.0.0.1:3000/api/version' -TimeoutSec 2 }
         catch { }
         if ($result.version -ceq $Commit) {
-            $processes = @(Get-BirdBrainProcesses $Root)
-            $servers = @($processes | Where-Object { $_.Kind -eq 'next' })
-            $launchers = @($processes | Where-Object { $_.Kind -eq 'launcher' })
+            # LocalService command lines may be hidden from the deploy account.
+            $serviceProcess = Get-CimInstance -ClassName Win32_Service -Filter "Name = 'BirdBrain'" -ErrorAction Stop
+            $nodes = @(Get-CimInstance -ClassName Win32_Process -Filter "Name = 'node.exe'" -ErrorAction Stop)
+            $descendants = @()
+            $parents = @($serviceProcess.ProcessId)
+            while ($serviceProcess.ProcessId -gt 0 -and $parents.Count -gt 0) {
+                $children = @($nodes | Where-Object { $_.ParentProcessId -in $parents -and $_.ProcessId -notin $descendants.ProcessId })
+                $descendants += $children
+                $parents = @($children | Select-Object -ExpandProperty ProcessId)
+            }
             $owners = @(Get-BirdBrainListeners | Select-Object -ExpandProperty OwningProcess -Unique)
-            if ($servers.Count -ne 1 -or $launchers.Count -gt 1 -or $owners.Count -ne 1 -or $owners[0] -ne $servers[0].Id) {
-                throw 'Expected exactly one BirdBrain Next server owning port 3000 and at most one launcher.'
+            $owner = @($descendants | Where-Object { $_.ProcessId -in $owners })
+            $extras = @(Get-BirdBrainProcesses $Root | Where-Object { $_.Id -notin $descendants.ProcessId })
+            if ($descendants.Count -ne 2 -or $owners.Count -ne 1 -or $owner.Count -ne 1 -or
+                $owner[0].ParentProcessId -notin $descendants.ProcessId -or $extras.Count -gt 0) {
+                throw 'Expected exactly one BirdBrain Next server owning port 3000 beneath its service launcher.'
             }
             return
         }
