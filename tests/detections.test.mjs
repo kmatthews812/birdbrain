@@ -17,3 +17,8 @@ test('reloads only when a running app sees a different release', () => {
   assert.equal(shouldReload('first', 'first'), false);
   assert.equal(shouldReload('first', ''), false);
 });
+
+test('preserves the complete detection for visualization tools', () => {
+  const bird = { id: 1012, commonName: ' Chestnut-backed Chickadee ', scientificName: 'Poecile rufescens', confidence: 0.29, timestamp: '2026-11-22T08:33:32-08:00', speciesCode: 'chbchi', source: { displayName: 'Bird Mic' }, clipName: 'bird.wav' };
+  assert.deepEqual(readDetection(JSON.stringify(bird)), { ...bird, commonName: 'Chestnut-backed Chickadee' });
+});
