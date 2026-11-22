@@ -137,3 +137,29 @@ test('a late history response keeps species received from the live stream', asyn
   await act(() => resolveHistory(Response.json({ birds: [{ commonName: 'Crow', scientificName: 'Corvus brachyrhynchos' }] })));
   assert.deepEqual([...document.querySelector('#past-bird').options].map(option => option.textContent), ['Choose a bird…', 'Crow', 'Robin']);
 });
+
+test('passes the preceding bird to a visualization, ignoring duplicate events and tracking birds during previews', async t => {
+  const received = [];
+  visualizations.push({ id: 'pair-test', name: 'Pair test', createdBy: 'Test', durationMs: 60000, Component: props => { received.push(props); return <h2>{props.bird.commonName}</h2>; } });
+  t.after(() => visualizations.pop());
+  const { source, change } = await mountBoard(t);
+  await act(() => document.querySelector('#randomize').click());
+  await change(document.querySelector('#visualization'), 'pair-test');
+  await act(() => source.emit('detection', robin));
+  assert.equal(received.at(-1).previousBird, null);
+  const crow = { id: 43, commonName: 'American Crow', scientificName: 'Corvus brachyrhynchos', confidence: .95 };
+  await act(() => source.emit('detection', crow));
+  assert.deepEqual(received.at(-1).previousBird, robin);
+  await act(() => source.emit('detection', crow));
+  await change(document.querySelector('#past-bird'), robin.scientificName);
+  await act(() => document.querySelector('#show-bird').click());
+  assert.deepEqual(received.at(-1).previousBird, crow);
+  const owl = { id: 44, commonName: 'Barn Owl', scientificName: 'Tyto alba', confidence: .99 };
+  await act(() => source.emit('detection', owl));
+  assert.deepEqual(received.at(-1).bird, robin);
+  await act(() => document.querySelector('#back-to-live').click());
+  const next = { ...crow, id: 45 };
+  await act(() => source.emit('detection', next));
+  assert.deepEqual(received.at(-1).bird, next);
+  assert.deepEqual(received.at(-1).previousBird, owl);
+});

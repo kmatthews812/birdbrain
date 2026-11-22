@@ -30,6 +30,8 @@ export default function Board({ version }) {
   const [preview, setPreview] = useState(false);
   const previewing = useRef(false);
   const previous = useRef(null);
+  const lastBird = useRef(null);
+  const [previousBird, setPreviousBird] = useState(null);
   useEffect(() => {
     const controller = new AbortController();
     setHistoryStatus('loading');
@@ -57,6 +59,8 @@ export default function Board({ version }) {
       : visualizations.find(item => item.id === options.current.selectedId);
     previous.current = next?.id;
     setVisualization(next);
+    setPreviousBird(lastBird.current);
+    lastBird.current = detection;
     setBird(detection);
     setSequence(value => value + 1);
   }, []);
@@ -80,6 +84,7 @@ export default function Board({ version }) {
       }
       setSeenBirds(current => mergeBirds(current, [detection]));
       if (!previewing.current) play(detection);
+      else lastBird.current = detection;
     });
 
     const controller = new AbortController();
@@ -136,7 +141,7 @@ export default function Board({ version }) {
         {historyStatus === 'ready' && !seenBirds.length && <span className="history-status">No birds recorded yet.</span>}
       </div>
       <section aria-live="polite">
-        {bird && visualization ? <Player key={sequence} visualization={visualization} bird={bird} onDone={finish} sound={sound} /> : <>
+        {bird && visualization ? <Player key={sequence} visualization={visualization} bird={bird} previousBird={previousBird} onDone={finish} sound={sound} /> : <>
           <div className="rings" aria-hidden="true" />
           <div className="caption"><h2>Listening for owls</h2></div>
         </>}
