@@ -11,12 +11,14 @@ can be added independently.
 **Celebrity Death Match**, also by Kevin, generates a playful claymation fight GIF
 with OpenAI using the current and preceding birds. It waits for an opponent on
 the first detection. To stage a manual matchup, preview one bird, select Celebrity
-Death Match with Randomize unchecked, then preview the second bird. Queued events update the preceding bird when their playback starts.
+Death Match with Randomize unchecked, then preview the second bird. Each queued matchup uses the bird immediately before it in queue order.
 The matchup remains visible until another detection or manual selection replaces it. Each matchup generates a new GIF and incurs an image API charge.
 
 **Bird Dance**, by Kevin, generates a fresh looping GIF of the current species
 doing a cheerful dance. It needs no previous bird and remains visible until
-another detection or manual selection replaces it.
+another detection or manual selection replaces it. Both GIF visualizations vary
+their stage, choreography, props and colors on each generation, avoiding the
+immediately previous scene.
 
 The upper-right selector chooses a specific visualization when **Randomize** is
 unchecked. Randomize is checked by default. Choose a previously seen species and
@@ -37,13 +39,17 @@ The component can render any React markup, SVG, canvas, images, or CSS animation
 inside the main stage. Components receive an `active` boolean: false while preparing
 in the queue, true while displayed. Start visual timers and interactive audio
 when active; tool-based sound is suppressed during preparation. Data-loading
-effects should keep their results when active changes. Scope your CSS to your component so other creations keep
+effects should keep their results when active changes. Call the supplied
+`onReady()` after content and images have loaded, or after rendering a finished
+error fallback. Do not call it while a loading placeholder is still shown or
+after cancellation. The queue waits for this callback before displaying the view. Scope your CSS to your component so other creations keep
 their styles. Honor `prefers-reduced-motion` where possible.
 
 ```jsx
-import React from 'react';
+import React, { useEffect } from 'react';
 
-export default function BirdParty({ bird }) {
+export default function BirdParty({ bird, onReady }) {
+  useEffect(() => { onReady(); }, [onReady]);
   return <div className="bird-party">
     <h2>{bird.commonName}</h2>
     <p>Welcome to the party!</p>
@@ -123,15 +129,18 @@ The Windows task still checks GitHub every minute for updates, even with no view
 ## Lifetimes and errors
 
 Each visualization starts a 30-second minimum display period. New detections and
-manual selections wait in arrival order; the stage shows “Next bird in…” while another bird waits.
+manual selections wait in arrival order. Every displayed view shows its remaining
+minimum display time, even when nothing else is queued.
 The recent-sightings sidebar highlights the currently displayed sighting, not
-the newest arrival.
-When that period ends, the next waiting bird starts its own 30-second period.
+the newest arrival. A small spinner marks sightings whose views are preparing.
+When that period ends and the next bird is ready, it starts its own full
+30-second period. If it is still preparing, the current view stays visible.
 If nothing is waiting, the current view stays until another bird arrives. Facts
 and GIFs begin loading as soon as a bird is queued, using the selector settings
 at that time. Each queued component stays mounted but hidden, then is revealed
-without restarting its requests. If generation is still running at its turn, the
-view continues loading on screen. Repeated species still get fresh playback; repeated event IDs
+without restarting its requests. Image loading and generation time do not count
+toward the 30 seconds. Before the first view is ready, the listening screen stays
+visible. Repeated species still get fresh playback; repeated event IDs
 within the last 100 detections are ignored. Leaving or hiding the page clears the
 queue, so no queued generation runs without a viewer.
 Before the first playback, the stage shows “Listening…” and the elapsed time since
