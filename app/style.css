@@ -17,8 +17,7 @@ h2 { font: normal clamp(2.2rem, 7vw, 6rem)/1.04 "Instrument Serif", Georgia, ser
 @keyframes call { from { transform: scale(.75); opacity: .35; } to { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .rings[data-detected="true"] { animation: none; } }
 .credit { position: absolute; bottom: 0; left: 0; right: 0; color: #bbd7d1; font-size: .85rem; }
-main { grid-template-rows: auto 1fr auto; }
-footer { padding-top: 2rem; text-align: center; }
+main { grid-template-rows: auto 1fr; }
 button { font: inherit; color: inherit; background: #27484b; border: 1px solid #76a39c; border-radius: 2rem; padding: .7rem 1.2rem; cursor: pointer; min-height: 44px; }
 button:focus-visible { outline: 3px solid #e0ad86; outline-offset: 3px; }
 .header-controls { display: flex; align-items: flex-start; gap: 1rem; flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
@@ -30,7 +29,7 @@ select:focus-visible, input:focus-visible { outline: 3px solid #e0ad86; outline-
 .checkbox-label { display: flex; align-items: center; gap: .45rem; min-height: 44px; cursor: pointer; }
 input[type="checkbox"] { width: 1.15rem; height: 1.15rem; accent-color: #a6ddd0; }
 @media (max-width: 760px) { header { align-items: flex-start; gap: 1.25rem; flex-wrap: wrap; } .header-controls { gap: .75rem; } }
-main { grid-template-rows: auto 1fr auto; gap: 1.5rem; }
+main { grid-template-rows: auto 1fr; gap: 1.5rem; }
 .preview-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .35rem .65rem; min-width: 0; }
 .preview-controls > label, .preview-controls .history-status { grid-column: 1 / -1; }
 .header-controls .connection { padding-top: 2.15rem; }
@@ -71,3 +70,6 @@ button:disabled { opacity: .5; cursor: default; }
 
 @media (max-width: 1100px) { header { flex-wrap: wrap; } .header-controls { justify-content: flex-start; } }
 @media (min-width: 641px) and (max-width: 1100px) { .header-controls { gap: .75rem; } .header-controls select { font-size: .9rem; } .preview-controls select { width: 12rem; } }
+
+.sound-controls { padding-top: 1.3rem; }
+.sound-controls p { max-width: 16rem; font-size: .8rem; color: #e0ad86; margin-top: .5rem; }

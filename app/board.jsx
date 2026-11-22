@@ -12,11 +12,13 @@ export default function Board({ version }) {
   const [sound] = useState(() => createSound());
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [soundError, setSoundError] = useState('');
+  const [soundReady, setSoundReady] = useState(false);
+  const alertRequest = useRef(null);
   useEffect(() => () => { sound.dispose(); }, [sound]);
   async function toggleSound() {
     try {
-      if (soundEnabled) sound.mute();
-      else await sound.enable();
+      if (soundEnabled) { alertRequest.current?.abort(); sound.mute(); }
+      else { await sound.enable(); setSoundReady(true); }
       setSoundEnabled(!soundEnabled);
       setSoundError('');
     } catch { setSoundError('Sound could not start. Tap to try again.'); }
@@ -95,6 +97,12 @@ export default function Board({ version }) {
       setSeenBirds(current => mergeBirds(current, [detection]));
       setLatestDetection(detection);
       updateLastSighting(detection.timestamp);
+      alertRequest.current?.abort();
+      const alert = new AbortController();
+      alertRequest.current = alert;
+      sound.play('/sounds/bird-alert.mp3', alert.signal).catch(() => {
+        if (!alert.signal.aborted) setSoundError('Bird alert could not play. Tap the sound button to try again.');
+      });
       play(detection);
     });
 
@@ -115,11 +123,12 @@ export default function Board({ version }) {
     document.addEventListener('visibilitychange', checkVersion);
     return () => {
       controller.abort();
+      alertRequest.current?.abort();
       clearInterval(timer);
       document.removeEventListener('visibilitychange', checkVersion);
       stream.close();
     };
-  }, [version, play, updateLastSighting]);
+  }, [version, play, updateLastSighting, sound]);
 
   return (
     <main>
@@ -148,6 +157,10 @@ export default function Board({ version }) {
             {historyStatus === 'error' && <><span className="history-status">Could not load previously seen birds.</span><button id="retry-history" type="button" onClick={() => setHistoryAttempt(value => value + 1)}>Retry</button></>}
             {historyStatus === 'ready' && !seenBirds.length && <span className="history-status">No birds recorded yet.</span>}
           </div>
+          <div className="sound-controls">
+            <button id="sound-toggle" type="button" onClick={toggleSound} aria-pressed={soundEnabled} title="Bird detection alerts and visualization audio">{soundEnabled ? 'Mute sound' : soundReady ? 'Unmute sound' : 'Enable sound'}</button>
+            {soundError && <p role="status">{soundError}</p>}
+          </div>
           <p className="connection"><i data-online={online} />{online ? 'Live' : 'Connecting'}</p>
         </div>
       </header>
@@ -160,10 +173,6 @@ export default function Board({ version }) {
         </section>
         <RecentHistory onHistory={onHistory} detection={latestDetection} onSelect={detection => play(detection, true)} />
       </div>
-      <footer>
-        <button type="button" onClick={toggleSound} aria-pressed={soundEnabled}>{soundEnabled ? 'Mute sound' : 'Enable sound'}</button>
-        {soundError && <p role="status">{soundError}</p>}
-      </footer>
     </main>
   );
 }

@@ -16,7 +16,14 @@ async function mountBoard(t, fetcher = async (url) => Response.json(url === '/ap
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   let source, resumed = 0;
   const requests = [];
-  window.AudioContext = class { async resume() { resumed++; } async close() {} };
+  const audio = [];
+  window.AudioContext = class {
+    destination = 'speakers';
+    async resume() { resumed++; }
+    async close() {}
+    async decodeAudioData() { return 'quack'; }
+    createBufferSource() { return { connect() {}, disconnect() {}, start() { audio.push('play'); }, stop() { audio.push('stop'); this.onended?.(); } }; }
+  };
   globalThis.EventSource = class extends dom.window.EventTarget {
     constructor(url) { super(); this.url = url; source = this; }
     close() { this.closed = true; }
@@ -24,6 +31,7 @@ async function mountBoard(t, fetcher = async (url) => Response.json(url === '/ap
   };
   t.mock.method(globalThis, 'fetch', (url, options) => {
     requests.push({ url, options });
+    if (url === '/sounds/bird-alert.mp3') return Promise.resolve(new Response('audio'));
     if (url === '/api/tools') return Promise.resolve(Response.json({ result: { data: [{ b64_json: 'R0lGODlh' }] } }));
     if (url === '/api/birds/recent') return Promise.resolve(Response.json({ birds: recent }));
     if (url === '/api/birds/fact') return Promise.resolve(Response.json({ fact: 'A bird fact.', sources: [] }));
@@ -34,7 +42,7 @@ async function mountBoard(t, fetcher = async (url) => Response.json(url === '/ap
   const root = createRoot(document.getElementById('root'));
   t.after(async () => { await act(() => root.unmount()); assert.equal(source.closed, true); dom.window.close(); });
   await act(() => root.render(<Board version="test" />));
-  return { source, requests, resumed: () => resumed, change: async (element, value) => {
+  return { source, requests, audio, resumed: () => resumed, change: async (element, value) => {
     await act(() => { element.value = value; element.dispatchEvent(new dom.window.Event('change', { bubbles: true })); });
   } };
 }
@@ -58,7 +66,7 @@ test('starts listening with named visualization disabled and Randomize checked',
 test('live detections play credited visualizations once, with sound controls and persist until replaced', async (t) => {
   const { source, resumed } = await mountBoard(t);
   assert.equal(source.url, '/api/birds/stream');
-  const sound = document.querySelector('footer button');
+  const sound = document.querySelector('header #sound-toggle');
   assert.equal(sound.textContent, 'Enable sound');
   await act(() => sound.click());
   assert.equal(resumed(), 1);
@@ -239,4 +247,31 @@ test('a new detection of the same species restarts facts and GIFs, while replaye
   assert.equal(imageCalls().length, 2);
   assert.equal(imageCalls()[0].options.signal.aborted, true);
   assert.notEqual(document.querySelector('.match-gif'), firstMatch);
+});
+
+
+test('alerts once for each new detection, including repeat species, and header mute silences alerts', async t => {
+  const { source, audio } = await mountBoard(t, undefined, [robin]);
+  const toggle = document.querySelector('header #sound-toggle');
+  assert.equal(toggle?.textContent, 'Enable sound');
+  await act(() => source.emit('detection', robin));
+  assert.deepEqual(audio, []);
+  await act(() => toggle.click());
+  await act(() => source.emit('detection', { ...robin, id: 43 }));
+  assert.deepEqual(audio, ['play']);
+  await act(() => source.emit('detection', { ...robin, id: 43 }));
+  assert.deepEqual(audio, ['play']);
+  await act(() => source.emit('detection', { ...robin, id: 44 }));
+  assert.deepEqual(audio, ['play', 'stop', 'play']);
+  await act(() => document.querySelector('aside li button').click());
+  assert.deepEqual(audio, ['play', 'stop', 'play']);
+  await act(() => toggle.click());
+  assert.equal(toggle.textContent, 'Unmute sound');
+  assert.deepEqual(audio, ['play', 'stop', 'play', 'stop']);
+  await act(() => source.emit('detection', { ...robin, id: 45 }));
+  assert.deepEqual(audio, ['play', 'stop', 'play', 'stop']);
+  await act(() => toggle.click());
+  await act(() => source.emit('detection', { ...robin, id: 46 }));
+  assert.equal(audio.at(-1), 'play');
+  assert.equal(audio.filter(event => event === 'play').length, 3);
 });
