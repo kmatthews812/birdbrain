@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { readDetection, shouldReload } from '../lib/detections.mjs';
 import { selectVisualization, visualizations } from '../visualizations/index.jsx';
 import Player from './player.jsx';
+import NextBird from './next-bird.jsx';
 import RecentHistory from './recent-history.jsx';
 import ListeningStatus from './listening-status.jsx';
 import { createPlaybackQueue } from '../lib/playback-queue.mjs';
@@ -38,6 +39,7 @@ export default function Board({ version }) {
     updateLastSighting(latest?.timestamp);
   }, [updateLastSighting]);
   const [bird, setBird] = useState(null);
+  const [startedAt, setStartedAt] = useState(0);
   const [sequence, setSequence] = useState(0);
   const [visualization, setVisualization] = useState(null);
   const [seenBirds, setSeenBirds] = useState([]);
@@ -69,6 +71,7 @@ export default function Board({ version }) {
   const options = useRef();
   options.current = { randomize, selectedId };
   const play = useCallback((detection, manual = false) => {
+    setStartedAt(Date.now());
     setPreview(manual);
     const next = options.current.randomize
       ? selectVisualization(visualizations, previous.current)
@@ -198,7 +201,6 @@ export default function Board({ version }) {
             <button id="sound-toggle" type="button" onClick={toggleSound} aria-pressed={soundEnabled} title="Bird detection alerts and visualization audio">{soundEnabled ? 'Mute sound' : soundReady ? 'Unmute sound' : 'Enable sound'}</button>
             {soundError && <p role="status">{soundError}</p>}
           </div>
-          {pendingCount > 0 && <p className="queue-status" role="status">{pendingCount} queued</p>}
           <p className="connection"><i data-online={online} />{!watching ? 'Paused' : online ? 'Live' : 'Connecting'}</p>
         </div>
       </header>
@@ -208,8 +210,9 @@ export default function Board({ version }) {
             <div className="rings" aria-hidden="true" />
             <ListeningStatus timestamp={lastSighting} loading={recentStatus === 'loading'} error={recentStatus === 'error'} />
           </>}
+          {watching && pendingCount > 0 && <NextBird startedAt={startedAt} />}
         </section>
-        {watching && <RecentHistory onHistory={onHistory} detection={latestDetection} onSelect={detection => enqueue(detection, true)} />}
+        {watching && <RecentHistory activeBird={bird} onHistory={onHistory} detection={latestDetection} onSelect={detection => enqueue(detection, true)} />}
       </div>
     </main>
   );

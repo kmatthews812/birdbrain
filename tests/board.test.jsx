@@ -345,13 +345,13 @@ test('queues every distinct detection for thirty seconds without generating upco
   await act(() => source.emit('detection', { ...robin, id: 44 }));
   await act(() => source.emit('detection', { ...robin, id: 44 }));
   assert.equal(document.querySelector('section h2').textContent, 'Robin');
-  assert.equal(document.querySelector('.queue-status').textContent, '2 queued');
+  assert.equal(document.querySelector('.next-bird').textContent, 'Next bird in 25 seconds');
   assert.equal(facts(), 1);
   await act(() => t.mock.timers.tick(24999));
   assert.equal(facts(), 1);
   await act(() => t.mock.timers.tick(1));
   assert.equal(document.querySelector('section h2').textContent, 'Crow');
-  assert.equal(document.querySelector('.queue-status').textContent, '1 queued');
+  assert.equal(document.querySelector('.next-bird').textContent, 'Next bird in 30 seconds');
   assert.equal(facts(), 2);
   await act(() => t.mock.timers.tick(29999));
   assert.equal(facts(), 2);
@@ -362,4 +362,24 @@ test('queues every distinct detection for thirty seconds without generating upco
   await act(() => t.mock.timers.tick(60000));
   assert.equal(document.querySelector('section h2').textContent, 'Robin');
   assert.equal(facts(), 3);
+});
+
+test('highlights the playing sighting while newer queued sightings stack above it and counts down', async t => {
+  const { source } = await mountBoard(t);
+  await act(() => document.querySelector('#randomize').click());
+  const first = { ...robin, timestamp: '2026-11-22T18:00:00Z' };
+  const next = { ...robin, id: 43, commonName: 'Crow', timestamp: '2026-11-22T18:00:05Z' };
+  await act(() => source.emit('detection', first));
+  assert.equal(document.querySelector('aside [aria-current="true"] .recent-name').textContent, 'Robin');
+  await act(() => t.mock.timers.tick(5000));
+  await act(() => source.emit('detection', next));
+  assert.equal(document.querySelector('aside li:first-child [aria-current]'), null);
+  assert.equal(document.querySelector('aside [aria-current="true"] .recent-name').textContent, 'Robin');
+  assert.equal(document.querySelector('.next-bird').textContent, 'Next bird in 25 seconds');
+  assert.equal(document.querySelector('header .queue-status'), null);
+  await act(() => t.mock.timers.tick(24000));
+  assert.equal(document.querySelector('.next-bird').textContent, 'Next bird in 1 second');
+  await act(() => t.mock.timers.tick(1000));
+  assert.equal(document.querySelector('aside [aria-current="true"] .recent-name').textContent, 'Crow');
+  assert.equal(document.querySelector('.next-bird'), null);
 });

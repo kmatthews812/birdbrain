@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-export default function RecentHistory({ detection, onSelect, onHistory }) {
+export default function RecentHistory({ detection, activeBird, onSelect, onHistory }) {
   const [birds, setBirds] = useState([]);
   const [status, setStatus] = useState('loading');
   const [attempt, setAttempt] = useState(0);
@@ -24,7 +24,7 @@ export default function RecentHistory({ detection, onSelect, onHistory }) {
     {status === 'loading' && <p className="recent-status">Loading recent sightings…</p>}
     {status === 'error' && <><p className="recent-status">Could not load recent sightings.</p><button type="button" onClick={() => setAttempt(value => value + 1)}>Retry recent sightings</button></>}
     {status === 'ready' && !birds.length && <p className="recent-status">No recent sightings yet.</p>}
-    <ol>{birds.map(bird => <li key={key(bird)}><button type="button" onClick={() => onSelect(bird)}>
+    <ol>{birds.map(bird => <li key={key(bird)}><button type="button" aria-current={activeBird && key(activeBird) === key(bird) ? "true" : undefined} onClick={() => onSelect(bird)}>
       <span className="recent-name">{bird.commonName}</span>
       <time dateTime={bird.timestamp}>{formatTime(bird.timestamp)}</time>
     </button></li>)}</ol>

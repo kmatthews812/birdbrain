@@ -77,3 +77,19 @@ button:disabled { opacity: .5; cursor: default; }
 .bird-dance h2 { font-size: clamp(2rem, 4vw, 3.5rem); margin-bottom: 1.5rem; }
 .dance-gif, .dance-placeholder { display: block; width: 100%; max-height: 60vh; min-height: 12rem; aspect-ratio: 1; object-fit: contain; border-radius: 1.5rem; background: #203b3e; }
 .dance-placeholder { display: grid; place-items: center; padding: 2rem; color: #bbd7d1; font-size: 1.25rem; }
+
+.recent-history button[aria-current="true"] {
+  background: #d8f3cf;
+  color: #18351d;
+  box-shadow: inset 4px 0 #4b8738;
+}
+.next-bird {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  padding: .5rem .85rem;
+  border-radius: 999px;
+  background: #18351de6;
+  color: white;
+  z-index: 2;
+}
