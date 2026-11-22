@@ -34,7 +34,10 @@ and add an entry to `visualizations`:
 
 IDs must be unique lowercase kebab-case and names and credits nonempty. The registry test checks these rules.
 The component can render any React markup, SVG, canvas, images, or CSS animation
-inside the main stage. Scope your CSS to your component so other creations keep
+inside the main stage. Components receive an `active` boolean: false while preparing
+in the queue, true while displayed. Start visual timers and interactive audio
+when active; tool-based sound is suppressed during preparation. Data-loading
+effects should keep their results when active changes. Scope your CSS to your component so other creations keep
 their styles. Honor `prefers-reduced-motion` where possible.
 
 ```jsx
@@ -88,10 +91,12 @@ and [animated GIF output](https://developers.openai.com/api/docs/guides/image-ge
 Model access depends on the configured OpenAI account. Calls incur API charges;
 Default View makes a fresh web-search request for each playback, including repeat
 sightings of the same species. Facts and generated GIFs are not cached or shared
-between playbacks. OpenAI may still return a similar fact on a new request. Photos
-are selected from licensed iNaturalist species photos, avoiding the previous image
-when alternatives exist. Candidate lists refresh hourly; each playback selects
-again. Photo credits travel with the selected image. BirdNET-Go’s cached image
+between playbacks. The server remembers 20 recent facts per species, asks for
+different information rather than paraphrases, and retries an exact normalized
+repeat once before reporting it unavailable. Semantic novelty is not guaranteed,
+and this memory resets when the server restarts. Photos use every available
+licensed iNaturalist candidate before repeating, retaining that rotation across
+hourly candidate refreshes. A finite photo pool will eventually cycle. Photo credits travel with the selected image. BirdNET-Go’s cached image
 is the fallback when alternatives cannot be loaded. There is no spending quota; other
 visualizations should cache expensive repeated generation.
 
@@ -105,7 +110,8 @@ The same audio context is reused after that tap; muting stops active sounds.
 
 ## Viewer activity
 
-OpenAI and photo-provider requests start only from a visible browser’s playback.
+OpenAI and photo-provider requests start only for the active or queued views
+of a visible browser.
 There are no background generation jobs. Hidden tabs and page departure close the
 BirdNET event stream, stop polling and sounds, and abort pending visualization
 requests. Returning to the page resumes listening without generating content for
@@ -117,11 +123,15 @@ The Windows task still checks GitHub every minute for updates, even with no view
 ## Lifetimes and errors
 
 Each visualization starts a 30-second minimum display period. New detections and
-manual selections wait in arrival order; the header shows how many are queued.
+manual selections wait in arrival order; the stage shows “Next bird in…” while another bird waits.
+The recent-sightings sidebar highlights the currently displayed sighting, not
+the newest arrival.
 When that period ends, the next waiting bird starts its own 30-second period.
 If nothing is waiting, the current view stays until another bird arrives. Facts
-and GIFs are generated only when playback starts, using the current visualization
-selector settings. Repeated species still get fresh playback; repeated event IDs
+and GIFs begin loading as soon as a bird is queued, using the selector settings
+at that time. Each queued component stays mounted but hidden, then is revealed
+without restarting its requests. If generation is still running at its turn, the
+view continues loading on screen. Repeated species still get fresh playback; repeated event IDs
 within the last 100 detections are ignored. Leaving or hiding the page clears the
 queue, so no queued generation runs without a viewer.
 Before the first playback, the stage shows “Listening…” and the elapsed time since
