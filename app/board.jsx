@@ -43,7 +43,13 @@ export default function Board({ version }) {
   const displayed = useRef(null);
   const nextSequence = useRef(0);
   const [activeId, setActiveId] = useState(null);
-  const [entries, setEntries] = useState([]);
+  const [entries, renderEntries] = useState([]);
+  const cached = useRef([]);
+  const setEntries = useCallback(update => {
+    cached.current = typeof update === 'function' ? update(cached.current) : update;
+    renderEntries(cached.current);
+  }, []);
+  const manualMode = useRef(false);
   const [seenBirds, setSeenBirds] = useState([]);
   const [pastBird, setPastBird] = useState('');
   const [historyStatus, setHistoryStatus] = useState('loading');
@@ -74,10 +80,11 @@ export default function Board({ version }) {
   const play = useCallback(item => {
     displayed.current = item;
     setStartedAt(Date.now());
-    setPreview(item.manual);
+    setPreview(false);
     setBird(item.detection);
     setActiveId(item.id);
-    setEntries(current => current.filter(entry => entry.id >= item.id));
+    item.queued = false;
+    setEntries(current => [...current]);
   }, []);
   const [pendingCount, setPendingCount] = useState(0);
   const [queue] = useState(() => createPlaybackQueue({
@@ -85,39 +92,60 @@ export default function Board({ version }) {
     onPendingChange: setPendingCount,
   }));
   const enqueue = useCallback((detection, manual = false) => {
+    if (!manual && manualMode.current) return;
+    if (manual) {
+      manualMode.current = true;
+      queue.clear();
+      for (const entry of cached.current) entry.queued = false;
+      setPreview(true);
+      setStartedAt(null);
+      const existing = [...cached.current].reverse().find(entry =>
+        sightingKey(entry.detection) === sightingKey(detection) &&
+        (options.current.randomize || entry.visualization.id === options.current.selectedId));
+      if (existing) {
+        displayed.current = existing;
+        setBird(existing.detection);
+        setActiveId(existing.id);
+        return;
+      }
+    }
     const visualization = options.current.randomize
       ? selectVisualization(visualizations, previous.current)
       : visualizations.find(item => item.id === options.current.selectedId);
-    const item = { id: ++nextSequence.current, detection, manual, visualization, previousBird: lastBird.current, ready: false };
+    const item = { id: ++nextSequence.current, detection, visualization, previousBird: lastBird.current, ready: false, queued: !manual };
     item.onReady = () => {
-      setEntries(current => current.map(entry => entry.id === item.id ? { ...entry, ready: true } : entry));
-      queue.markReady(item);
+      item.ready = true;
+      setEntries(current => [...current]);
+      if (item.queued) queue.markReady(item);
     };
     previous.current = visualization?.id;
     lastBird.current = detection;
     setEntries(current => [...current, item]);
-    if (!displayed.current) {
+    if (manual || !displayed.current) {
       displayed.current = item;
       setBird(item.detection);
       setActiveId(item.id);
       setStartedAt(null);
     }
-    queue.enqueue(item, { ready: false });
-  }, [queue]);
+    if (!manual) queue.enqueue(item, { ready: false });
+  }, [queue, setEntries]);
   useEffect(() => () => queue.clear(), [queue]);
   const finish = useCallback(() => {
     queue.clear();
-    setEntries([]);
+    manualMode.current = false;
+    for (const entry of cached.current) entry.queued = false;
     lastBird.current = null;
     previous.current = null;
     setPreview(false);
     setBird(null);
+    setActiveId(null);
     displayed.current = null;
   }, [queue]);
 
   useEffect(() => {
     const pause = () => {
       queue.clear();
+      manualMode.current = false;
       setEntries([]);
       lastBird.current = null;
       previous.current = null;
@@ -232,8 +260,8 @@ export default function Board({ version }) {
               <div className="rings" aria-hidden="true" />
               <ListeningStatus timestamp={lastSighting} loading={recentStatus === 'loading'} error={recentStatus === 'error'} />
             </>}
-            {entries.map(item => <div key={item.id} data-playback={item.id} hidden={item.id !== activeId}><Player visualization={item.visualization} bird={item.detection} previousBird={item.previousBird} sound={sound} active={item.id === activeId} onReady={item.onReady} /></div>)}
-            {bird && startedAt !== null && <NextBird startedAt={startedAt} pending={pendingCount > 0} />}
+            {[...entries].sort((a, b) => Number(b.id === activeId) - Number(a.id === activeId)).map(item => <div key={item.id} data-playback={item.id} hidden={item.id !== activeId}><Player visualization={item.visualization} bird={item.detection} previousBird={item.previousBird} sound={sound} active={item.id === activeId} onReady={item.onReady} /></div>)}
+            {!preview && bird && startedAt !== null && <NextBird startedAt={startedAt} pending={pendingCount > 0} />}
           </>}
         </section>
         {watching && <RecentHistory processingBirds={entries.filter(item => !item.ready).map(item => item.detection)} activeBird={bird} onHistory={onHistory} detection={latestDetection} onSelect={detection => enqueue(detection, true)} />}
@@ -248,3 +276,5 @@ function mergeBirds(existing, incoming) {
   for (const bird of incoming) birds.set(birdKey(bird), { ...birds.get(birdKey(bird)), ...bird });
   return [...birds.values()].sort((a, b) => a.commonName.localeCompare(b.commonName));
 }
+
+function sightingKey(bird) { return bird.id != null ? `id:${bird.id}` : `${bird.scientificName || bird.commonName}:${bird.timestamp || ''}`; }

@@ -138,8 +138,10 @@ test('manually previews a historical bird with the selected view, then resumes l
   assert.equal(document.querySelector('h2').textContent, 'Common Raven');
   await act(() => t.mock.timers.tick(30000));
   await act(() => source.emit('detection', robin));
+  assert.equal(document.querySelector('h2').textContent, 'Common Raven');
+  await act(() => document.querySelector('#back-to-live').click());
+  await act(() => source.emit('detection', { ...robin, id: 99 }));
   assert.equal(document.querySelector('h2').textContent, 'Robin');
-  assert.equal(document.querySelector('#back-to-live'), null);
   await act(() => t.mock.timers.tick(30000));
   await act(() => show.click());
   assert.deepEqual([...select.options].map(option => option.textContent), ['Choose a bird…', 'Common Raven', 'Robin']);
@@ -181,7 +183,7 @@ test('a late history response keeps species received from the live stream', asyn
 
 test('passes the preceding bird to a visualization, ignoring duplicate events and tracking birds during previews', async t => {
   const received = [];
-  visualizations.push({ id: 'pair-test', name: 'Pair test', createdBy: 'Test', Component: props => { useEffect(props.onReady, [props.onReady]); received.push(props); return <h2>{props.bird.commonName}</h2>; } });
+  visualizations.push({ id: 'pair-test', name: 'Pair test', createdBy: 'Test', Component: props => { useEffect(props.onReady, [props.onReady]); if (props.active) received.push(props); return <h2>{props.bird.commonName}</h2>; } });
   t.after(() => visualizations.pop());
   const { source, change } = await mountBoard(t);
   await act(() => document.querySelector('#randomize').click());
@@ -198,7 +200,8 @@ test('passes the preceding bird to a visualization, ignoring duplicate events an
   await change(document.querySelector('#past-bird'), robin.scientificName);
   await act(() => t.mock.timers.tick(30000));
   await act(() => document.querySelector('#show-bird').click());
-  assert.deepEqual(received.at(-1).previousBird, crow);
+  assert.equal(received.at(-1).previousBird, null);
+  await act(() => document.querySelector('#back-to-live').click());
   const owl = { id: 44, commonName: 'Barn Owl', scientificName: 'Tyto alba', confidence: .99 };
   await act(() => t.mock.timers.tick(30000));
   await act(() => source.emit('detection', owl));
@@ -213,7 +216,7 @@ test('passes the preceding bird to a visualization, ignoring duplicate events an
 
 test('recent sidebar clicks use the selected visualization and live detections appear during manual playback', async t => {
   const selected = [];
-  visualizations.push({ id: 'sidebar-test', name: 'Sidebar test', createdBy: 'Test', Component: ({ bird, onReady }) => { useEffect(onReady, [onReady]); selected.push(bird); return <h2>{bird.commonName}</h2>; } });
+  visualizations.push({ id: 'sidebar-test', name: 'Sidebar test', createdBy: 'Test', Component: ({ bird, onReady, active }) => { useEffect(onReady, [onReady]); if (active) selected.push(bird); return <h2>{bird.commonName}</h2>; } });
   t.after(() => visualizations.pop());
   const { source, change } = await mountBoard(t, undefined, [robin]);
   assert.equal(document.querySelector('section h2').textContent, 'Listening…');
@@ -227,7 +230,7 @@ test('recent sidebar clicks use the selected visualization and live detections a
   await act(() => t.mock.timers.tick(30000));
   await act(() => source.emit('detection', crow));
   assert.deepEqual([...document.querySelectorAll('.recent-name')].map(el => el.textContent), ['American Crow', 'Robin']);
-  assert.deepEqual(selected.at(-1), crow);
+  assert.deepEqual(selected.at(-1), robin);
   await act(() => t.mock.timers.tick(30000));
   await act(() => document.querySelector('aside li button').click());
   assert.deepEqual(selected.at(-1), crow);
@@ -261,7 +264,7 @@ test('a new detection of the same species restarts facts and GIFs, while replaye
   await act(() => t.mock.timers.tick(30000));
   await act(() => source.emit('detection', { ...robin, id: 43 }));
   assert.equal(factCalls().length, 2);
-  assert.equal(factCalls()[0].options.signal.aborted, true);
+  assert.equal(factCalls()[0].options.signal.aborted, false);
   assert.notEqual(document.querySelector('section article'), firstView);
   await act(() => t.mock.timers.tick(30000));
   await act(() => source.emit('detection', { ...robin, id: 43 }));
@@ -276,7 +279,7 @@ test('a new detection of the same species restarts facts and GIFs, while replaye
   await act(() => t.mock.timers.tick(30000));
   await act(() => source.emit('detection', { ...robin, id: 45 }));
   assert.equal(imageCalls().length, 2);
-  assert.equal(imageCalls()[0].options.signal.aborted, true);
+  assert.equal(imageCalls()[0].options.signal.aborted, false);
   assert.notEqual(document.querySelector('.match-gif'), firstMatch);
 });
 
@@ -424,4 +427,79 @@ test('shows the first live bird loading and gives completed live views thirty se
   await act(() => ready.get(43)());
   assert.equal(document.querySelector('[data-playback]:not([hidden]) h2').textContent, 'Crow');
   assert.equal(document.querySelectorAll('aside [role="status"]').length, 0);
+});
+
+test('manual clicks instantly reuse cached sightings and live arrivals do not interrupt browsing', async t => {
+  const crow = { ...robin, id: 43, commonName: 'Crow', timestamp: '2026-11-22T18:00:05Z' };
+  const { source, requests } = await mountBoard(t, undefined, [robin, crow]);
+  await act(() => document.querySelector('#randomize').click());
+  await act(() => source.emit('detection', robin));
+  const robinView = document.querySelector('[data-playback]:not([hidden]) article');
+  await act(() => source.emit('detection', crow));
+  const crowView = [...document.querySelectorAll('[data-playback] article')].find(el => el.querySelector('h2').textContent === 'Crow');
+  const clickBird = async name => act(() => [...document.querySelectorAll('aside button')].find(el => el.textContent.startsWith(name)).click());
+  await clickBird('Crow');
+  assert.equal(document.querySelector('[data-playback]:not([hidden]) article') === crowView, true);
+  assert.equal(document.querySelector('.next-bird'), null);
+  await clickBird('Robin');
+  assert.equal(document.querySelector('[data-playback]:not([hidden]) article') === robinView, true);
+  await clickBird('Crow');
+  assert.equal(document.querySelector('[data-playback]:not([hidden]) article') === crowView, true);
+  assert.equal(requests.filter(call => call.url === '/api/birds/fact').length, 2);
+  await act(() => source.emit('detection', { ...robin, id: 44, commonName: 'Owl' }));
+  await act(() => t.mock.timers.tick(120000));
+  assert.equal(document.querySelector('[data-playback]:not([hidden]) article') === crowView, true);
+  assert.equal(requests.filter(call => call.url === '/api/birds/fact').length, 2);
+  await act(() => document.querySelector('#back-to-live').click());
+  await act(() => source.emit('detection', { ...robin, id: 45 }));
+  assert.equal(requests.filter(call => call.url === '/api/birds/fact').length, 3);
+  assert.equal(document.querySelector('.next-bird').textContent, '30 seconds remaining');
+});
+
+test('an uncached manual selection loads immediately and late completion never steals the screen', async t => {
+  const ready = new Map();
+  visualizations.push({ id: 'manual-loading', name: 'Manual loading', createdBy: 'Test', Component: ({ bird, onReady }) => {
+    ready.set(bird.id, onReady);
+    return <h2>{bird.commonName}</h2>;
+  } });
+  t.after(() => visualizations.pop());
+  const crow = { ...robin, id: 43, commonName: 'Crow', timestamp: '2026-11-22T18:00:05Z' };
+  const { change } = await mountBoard(t, undefined, [robin, crow]);
+  await act(() => document.querySelector('#randomize').click());
+  await change(document.querySelector('#visualization'), 'manual-loading');
+  const clickBird = async name => act(() => [...document.querySelectorAll('aside button')].find(el => el.textContent.startsWith(name)).click());
+  await clickBird('Robin');
+  assert.equal(document.querySelector('[data-playback]:not([hidden]) h2').textContent, 'Robin');
+  assert.equal(document.querySelector('aside [role="status"]').getAttribute('aria-label'), 'Preparing Robin');
+  await clickBird('Crow');
+  await act(() => ready.get(42)());
+  assert.equal(document.querySelector('[data-playback]:not([hidden]) h2').textContent, 'Crow');
+  await act(() => ready.get(43)());
+  await clickBird('Robin');
+  assert.equal(document.querySelector('[data-playback]:not([hidden]) h2').textContent, 'Robin');
+  assert.equal(document.querySelector('.next-bird'), null);
+});
+
+test('clicking a live queued bird reveals its existing in-progress view immediately', async t => {
+  const ready = new Map(), mounts = [];
+  visualizations.push({ id: 'queued-loading', name: 'Queued loading', createdBy: 'Test', Component: ({ bird, onReady }) => {
+    ready.set(bird.id, onReady);
+    useEffect(() => { mounts.push(bird.id); }, []);
+    return <h2>{bird.commonName}</h2>;
+  } });
+  t.after(() => visualizations.pop());
+  const { source, change } = await mountBoard(t);
+  await act(() => document.querySelector('#randomize').click());
+  await change(document.querySelector('#visualization'), 'queued-loading');
+  await act(() => source.emit('detection', robin));
+  await act(() => ready.get(42)());
+  await act(() => source.emit('detection', { ...robin, id: 43, commonName: 'Crow' }));
+  const prepared = [...document.querySelectorAll('[data-playback] h2')].find(el => el.textContent === 'Crow');
+  await act(() => [...document.querySelectorAll('aside button')].find(el => el.textContent.startsWith('Crow')).click());
+  assert.equal(document.querySelector('[data-playback]:not([hidden]) h2') === prepared, true);
+  assert.equal(document.querySelector('.next-bird'), null);
+  assert.deepEqual(mounts, [42, 43]);
+  await act(() => ready.get(43)());
+  assert.equal(document.querySelector('[data-playback]:not([hidden]) h2') === prepared, true);
+  assert.deepEqual(mounts, [42, 43]);
 });
