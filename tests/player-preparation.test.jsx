@@ -43,3 +43,33 @@ test('a rendering failure makes the completed fallback ready instead of blocking
   assert.equal(document.querySelector('h2').textContent, 'Robin');
   assert.equal(document.querySelector('[role="status"]').textContent, 'This visualization needs a little help. Listening for the next bird.');
 });
+
+test('hiding a cached view stops its audio without discarding the visual session and replay can sound again', async t => {
+  const dom = new JSDOM('<div id="root"></div>');
+  globalThis.window = dom.window; globalThis.document = dom.window.document; globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const root = createRoot(document.getElementById('root'));
+  t.after(async () => { await act(() => root.unmount()); dom.window.close(); });
+  let props;
+  const calls = [];
+  const sound = { play: async (url, signal) => { calls.push({ url, signal }); return true; } };
+  const visualization = { name: 'Cached', createdBy: 'Test', Component: current => { props = current; return <h2>Cached result</h2>; } };
+  const render = active => act(() => root.render(<Player visualization={visualization} bird={{ commonName: 'Robin' }} sound={sound} active={active} />));
+  await render(true);
+  const sessionSignal = props.signal;
+  const tools = props.tools;
+  await tools.playSound('/first.mp3');
+  assert.equal(calls[0].signal.aborted, false);
+  await render(false);
+  assert.equal(calls[0].signal.aborted, true);
+  assert.equal(sessionSignal.aborted, false);
+  assert.equal(props.tools, tools);
+  assert.equal(await tools.playSound('/hidden.mp3'), false);
+  await render(true);
+  await tools.playSound('/replayed.mp3');
+  assert.deepEqual(calls.map(call => call.url), ['/first.mp3', '/replayed.mp3']);
+  assert.equal(calls[1].signal.aborted, false);
+  assert.equal(props.signal, sessionSignal);
+  await act(() => window.dispatchEvent(new window.Event('pagehide')));
+  assert.equal(calls[1].signal.aborted, true);
+  assert.equal(sessionSignal.aborted, true);
+});

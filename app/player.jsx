@@ -6,10 +6,19 @@ import { createTools } from '../lib/visualization-tools.mjs';
 export default function Player({ visualization, bird, previousBird, sound, active = true, onReady }) {
   const isActive = useRef(active);
   isActive.current = active;
+  const audio = useRef(null);
+  useEffect(() => {
+    if (!active) audio.current?.abort();
+    return () => audio.current?.abort();
+  }, [active]);
   const [session, setSession] = useState(null);
   useEffect(() => {
     const controller = new AbortController();
-    setSession({ cancel: () => controller.abort(), signal: controller.signal, tools: createTools({ signal: controller.signal, sound: { play: (url, signal) => isActive.current && sound ? sound.play(url, signal) : Promise.resolve(false) } }) });
+    setSession({ cancel: () => controller.abort(), signal: controller.signal, tools: createTools({ signal: controller.signal, sound: { play: (url, signal) => {
+      if (!isActive.current || !sound) return Promise.resolve(false);
+      if (!audio.current || audio.current.signal.aborted) audio.current = new AbortController();
+      return sound.play(url, AbortSignal.any([signal, audio.current.signal]));
+    } } }) });
     const cancel = () => controller.abort();
     window.addEventListener('pagehide', cancel);
     return () => { window.removeEventListener('pagehide', cancel); cancel(); };
