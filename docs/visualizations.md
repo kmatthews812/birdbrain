@@ -1,0 +1,127 @@
+# Creating a BirdBrain visualization
+
+A visualization is a React component plus a registry entry. The framework selects
+one at random for each new BirdNET-Go detection, avoiding the previous choice
+when more than one is registered. It passes the entire validated detection as
+`bird`, a `tools` object, and an `AbortSignal` named `signal`. The existing rings
+are the starter visualization; family creations can be added independently.
+
+Create a component under `visualizations/`, import it in `visualizations/index.jsx`,
+and add an entry to `visualizations`:
+
+```jsx
+{ id: 'bird-party', name: 'Bird Party', createdBy: 'Your name',
+  durationMs: 20000, Component: BirdParty }
+```
+
+IDs must be unique lowercase kebab-case, names and credits nonempty, and durations
+between 1 and 300000 milliseconds. The registry test checks these rules.
+The component can render any React markup, SVG, canvas, images, or CSS animation
+inside the main stage. Scope your CSS to your component so other creations keep
+their styles. Honor `prefers-reduced-motion` where possible.
+
+```jsx
+import React from 'react';
+
+export default function BirdParty({ bird }) {
+  return <div className="bird-party">
+    <h2>{bird.commonName}</h2>
+    <p>Welcome to the party!</p>
+  </div>;
+}
+```
+
+`bird` always has `commonName` and `confidence` (0–1). BirdNET-Go may also supply
+`id`, `scientificName`, `speciesCode`, `timestamp`, `source`, `clipName`, `birdImage`,
+and other fields. Treat those as optional. The framework displays the creation's
+name and author below the stage.
+
+## Tools
+
+All tools are promises. HTTP requests go through the Next.js server, so the iPad
+never receives API keys. `birdnet` uses the server's configured host and permits
+JSON GET requests under `/api/v2/`; it does not change BirdNET settings.
+
+```js
+const recent = await tools.birdnet({ path: '/api/v2/detections/recent' });
+const detections = await tools.birdnet({
+  path: '/api/v2/detections', params: { species: bird.scientificName, limit: 10 },
+});
+const text = await tools.generate({ prompt: `Write a short joke about ${bird.commonName}.` });
+const facts = await tools.search({ prompt: `Find a fun fact about ${bird.commonName}, with sources.` });
+const gif = await tools.image({ prompt: `A dancing ${bird.commonName}`, format: 'gif' });
+await tools.playSound('/sounds/chirp.wav');
+```
+
+The second REST example illustrates parameter forwarding; check your installed
+BirdNET-Go API for supported filters. REST paths contain letters, digits, slashes,
+underscores, and hyphens; put search text in `params` for URL encoding. Media/binary
+responses are not supported by this JSON tool.
+
+`generate` and `search` return the raw OpenAI Responses JSON. Extract text from
+`result.output` message items' `content` entries with `type === 'output_text'`;
+`text` contains the text and `annotations` contains source citations. Render
+search citations as visible links. Do not assume the first output item is a message.
+`image` returns raw Images JSON: `result.data[0].b64_json` can be displayed as
+`data:image/gif;base64,...` (or `image/png` for the default PNG format).
+
+The API supports [web search](https://developers.openai.com/api/docs/guides/tools-web-search)
+and [animated GIF output](https://developers.openai.com/api/docs/guides/image-generation#generate-animated-gif-output).
+Model access depends on the configured OpenAI account. Calls incur API charges;
+no AI calls happen in the built-in rings visualization. There is no asset cache or
+spending quota in this initial framework. Prefer prepared assets or caching in a
+future visualization when generation would be slow or repeated.
+
+Put sound assets in `public/sounds/`. Tap **Enable sound** once after opening or
+reloading the page. `playSound` returns `false` when muted and `true` when playback
+starts, and rejects if loading fails. External audio URLs need to allow CORS.
+The same audio context is reused after that tap; muting stops active sounds.
+
+## Lifetimes and errors
+
+Each new detection immediately replaces the previous visualization. Repeated IDs
+within the last 100 detections are ignored. After `durationMs`, the stage returns
+to “Listening for owls.” Events received while the page is disconnected or asleep
+are not replayed; this is a live display, not a durable event log.
+
+Replacement, timeout, and render errors abort tool requests and stop sounds. Your
+component must still clean up its own timers, animation frames, listeners, and
+other resources in effect cleanup functions. Catch async errors inside the
+component; React error boundaries handle render/lifecycle failures, not arbitrary
+rejected promises or event handlers.
+
+```jsx
+useEffect(() => {
+  tools.generate({ prompt: `A short greeting for ${bird.commonName}` })
+    .then(result => { if (!signal.aborted) setResult(result); })
+    .catch(error => { if (!signal.aborted) setError(error.message); });
+}, [bird, tools, signal]);
+```
+
+BirdNET tool requests time out after 15 seconds; OpenAI requests after 120 seconds,
+or sooner when the visualization ends. For expensive generation, select a suitable
+duration and show a useful placeholder immediately. New detections can still
+interrupt it. Aborting a request does not guarantee cancellation of provider charges.
+Never execute generated code or inject untrusted HTML into the page. Components
+added to this repository are trusted application code, not sandboxed plugins.
+
+## Configuration and testing
+
+Copy `.env.example` to `.env.local` on the Mac, add `OPENAI_API_KEY` locally when
+ready, and restart Next.js. `.env.local` is ignored by Git. Model defaults can be
+overridden with `OPENAI_MODEL` and `OPENAI_IMAGE_MODEL`.
+
+On Windows, set these as system environment variables available to the BirdBrain
+service, then reboot so the service receives the updated environment. Do not put
+secrets in Git or a commit-specific release directory: deployments replace releases.
+The installed service already sets `BIRDNET_BASE_URL=http://127.0.0.1:8080`.
+
+Until a key is configured, AI tools report “Set OPENAI_API_KEY on the BirdBrain
+server to enable this tool.” BirdNET events, REST queries, local visuals, and sound
+work independently. The tool endpoint accepts same-origin browser POSTs only;
+keep this app on the trusted home LAN. It has no account login or per-user quota.
+
+Run `npm test` and `npm run build` with a supported Node version before committing.
+Add focused behavior tests for each creation. Test Safari on the actual iPad,
+including sound after a fresh page load, portrait/landscape layouts, and reconnects
+after sleep. For an always-on display, use power and disable Auto-Lock in iPad settings.

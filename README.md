@@ -58,3 +58,19 @@ npm run build
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\ReleaseState.Tests.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\ReleaseActivation.Tests.ps1
 ```
+
+## Visualization framework
+
+Each new detection plays a registered React visualization with the complete bird
+payload, its name, and its creator credit. The current rings are the first entry.
+New detections replace the current scene; scenes time out back to the listening
+screen. Tools support BirdNET JSON REST queries, OpenAI text, web search,
+PNG/animated GIF generation, and sound with cancellation between scenes.
+
+See [the visualization author guide](docs/visualizations.md) for the component
+contract, tool examples, lifecycle, and server-only API-key setup.
+
+For local development against the Windows BirdNET-Go server, copy `.env.example`
+to `.env.local`, then run `npm run build` and `npm start`. Windows retains its
+loopback connection to BirdNET-Go. OpenAI tools remain optional until a server key
+is configured. Tap **Enable sound** on the iPad after opening or reloading the page.
