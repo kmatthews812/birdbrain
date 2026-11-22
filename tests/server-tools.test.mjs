@@ -130,3 +130,16 @@ test('does not expose OpenAI error bodies or credentials', async () => {
   assert.equal(response.status, 502);
   assert.deepEqual(await response.json(), {error:'The upstream service could not complete this request.'});
 });
+
+test('web search forces the hosted search tool and preserves citations in the response', async () => {
+  const result = {output:[{type:'message',content:[{type:'output_text',text:'Robins eat worms.',annotations:[{type:'url_citation',url:'https://example.org/robin',title:'Robin'}]}]}]};
+  const response = await handleToolRequest(request({tool:'search',input:{prompt:'Find a robin fact'}}), {
+    env:{OPENAI_API_KEY:'key'},fetch:async (url, options) => {
+      assert.equal(String(url), 'https://api.openai.com/v1/responses');
+      assert.deepEqual(JSON.parse(options.body), {model:'gpt-6.2-astra',input:'Find a robin fact',store:false,tools:[{type:'web_search'}],tool_choice:'required'});
+      return Response.json(result);
+    },
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {result});
+});
