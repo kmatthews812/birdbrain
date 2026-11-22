@@ -89,3 +89,58 @@ test('clearing cancels pending playback and invalidates stale timer callbacks', 
   advance(30000);
   assert.deepEqual(played.at(-1), { item: 'raven', at: 31000 });
 });
+
+test('waits for first readiness without timers and starts its minimum display period then', () => {
+  const { queue, played, counts, timers, advance } = setup();
+  const first = { id: 1 }, second = { id: 2 };
+  queue.enqueue(first, { ready: false });
+  queue.enqueue(second);
+  advance(45000);
+  assert.deepEqual(played, []);
+  assert.equal(timers.size, 0);
+  assert.deepEqual(counts, [1, 2]);
+  queue.markReady(first);
+  assert.deepEqual(played, [{ item: first, at: 45000 }]);
+  advance(29999);
+  assert.equal(played.length, 1);
+  advance(1);
+  assert.deepEqual(played, [{ item: first, at: 45000 }, { item: second, at: 75000 }]);
+});
+
+test('keeps the current bird until the next is ready and never skips a processing head', () => {
+  const { queue, played, timers, advance } = setup();
+  const first = { id: 1 }, second = { id: 2 }, third = { id: 3 };
+  queue.enqueue(first);
+  queue.enqueue(second, { ready: false });
+  queue.enqueue(third, { ready: false });
+  queue.markReady(third);
+  advance(90000);
+  assert.deepEqual(played, [{ item: first, at: 0 }]);
+  assert.equal(timers.size, 0);
+  queue.markReady(second);
+  assert.deepEqual(played, [{ item: first, at: 0 }, { item: second, at: 90000 }]);
+  advance(29999);
+  assert.equal(played.length, 2);
+  advance(1);
+  assert.deepEqual(played.at(-1), { item: third, at: 120000 });
+});
+
+test('readiness before the minimum deadline waits and readiness after clearing is ignored', () => {
+  const { queue, played, counts, timers, advance } = setup();
+  const first = { id: 1 }, second = { id: 2 };
+  queue.enqueue(first);
+  queue.enqueue(second, { ready: false });
+  advance(5000);
+  queue.markReady(second);
+  queue.markReady({ id: 2 });
+  assert.deepEqual(played, [{ item: first, at: 0 }]);
+  assert.equal(timers.size, 1);
+  advance(24999);
+  assert.equal(played.length, 1);
+  queue.clear();
+  queue.markReady(second);
+  advance(60000);
+  assert.deepEqual(played, [{ item: first, at: 0 }]);
+  assert.deepEqual(counts, [1, 0]);
+  assert.equal(timers.size, 0);
+});
