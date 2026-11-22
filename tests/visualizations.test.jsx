@@ -24,7 +24,7 @@ test('registered visualizations declare unique IDs, credits, components, and bou
     assert.equal(typeof v.Component, 'function');
     assert.equal(v.durationMs > 0 && v.durationMs <= 300000, true);
   }
-  assert.equal(visualizations[0].id, 'rings');
+  assert.deepEqual(visualizations.map(({ id, name, createdBy }) => ({ id, name, createdBy })), [{ id: 'default-view', name: 'Default View', createdBy: 'Kevin' }]);
 });
 
 test('player passes bird and tools, credits the author, and cleans up when replaced', async () => {

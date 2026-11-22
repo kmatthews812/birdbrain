@@ -24,6 +24,19 @@ export default function Board({ version }) {
   const [sequence, setSequence] = useState(0);
   const [visualization, setVisualization] = useState(null);
   const previous = useRef(null);
+  const [randomize, setRandomize] = useState(true);
+  const [selectedId, setSelectedId] = useState(visualizations[0].id);
+  const options = useRef();
+  options.current = { randomize, selectedId };
+  const play = useCallback((detection) => {
+    const next = options.current.randomize
+      ? selectVisualization(visualizations, previous.current)
+      : visualizations.find(item => item.id === options.current.selectedId);
+    previous.current = next?.id;
+    setVisualization(next);
+    setBird(detection);
+    setSequence(value => value + 1);
+  }, []);
   const finish = useCallback(() => setBird(null), []);
 
   useEffect(() => {
@@ -38,11 +51,7 @@ export default function Board({ version }) {
         seen.add(detection.id);
         if (seen.size > 100) seen.delete(seen.values().next().value);
       }
-      const next = selectVisualization(visualizations, previous.current);
-      previous.current = next?.id;
-      setVisualization(next);
-      setBird(detection);
-      setSequence((value) => value + 1);
+      play(detection);
     });
 
     const controller = new AbortController();
@@ -66,7 +75,7 @@ export default function Board({ version }) {
       document.removeEventListener('visibilitychange', checkVersion);
       stream.close();
     };
-  }, [version]);
+  }, [version, play]);
 
   return (
     <main>
@@ -75,7 +84,16 @@ export default function Board({ version }) {
           <img src="/birdbrain.png" alt="BirdBrain mascot with a popped-open brain" width="64" height="64" />
           <h1>BirdBrain</h1>
         </div>
-        <p><i data-online={online} />{online ? 'Live' : 'Connecting'}</p>
+        <div className="header-controls">
+          <div className="visualization-controls">
+            <label htmlFor="visualization">Visualization</label>
+            <select id="visualization" value={selectedId} disabled={randomize} onChange={event => setSelectedId(event.target.value)}>
+              {visualizations.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+            <label htmlFor="randomize" className="checkbox-label"><input id="randomize" type="checkbox" checked={randomize} onChange={event => setRandomize(event.target.checked)} />Randomize</label>
+          </div>
+          <p className="connection"><i data-online={online} />{online ? 'Live' : 'Connecting'}</p>
+        </div>
       </header>
       <section aria-live="polite">
         {bird && visualization ? <Player key={sequence} visualization={visualization} bird={bird} onDone={finish} sound={sound} /> : <>

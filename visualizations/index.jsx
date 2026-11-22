@@ -11,7 +11,7 @@ function Rings({ bird }) {
 }
 
 export const visualizations = [
-  { id: 'rings', name: 'Birdsong rings', createdBy: 'BirdBrain', durationMs: 20000, Component: Rings },
+  { id: 'default-view', name: 'Default View', createdBy: 'Kevin', durationMs: 20000, Component: Rings },
 ];
 
 export function selectVisualization(entries, previousId, random = Math.random) {
