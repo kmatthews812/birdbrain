@@ -8,15 +8,16 @@ function global:Get-ScheduledTask { param($TaskName) return [pscustomobject]@{ S
 function global:Disable-ScheduledTask { param($TaskName) $global:migrationEvents.Add('disable') }
 function global:icacls.exe {
     param($Path, $Operation, $Owner, $Recursive)
+    if ($Operation -eq '/grant') { $global:LASTEXITCODE = 0; return }
     if ($Operation -ne '/setowner' -or $Owner -ne 'test-deploy-user' -or $Recursive -ne '/T') { throw 'Incorrect ownership transfer' }
     $global:migrationEvents.Add('ownership'); $global:LASTEXITCODE = 0
 }
 function global:Enable-ScheduledTask { param($TaskName) $global:migrationEvents.Add('enable') }
 try {
-    New-Item -ItemType Directory -Path $source, (Join-Path $hostRoot 'data/app/.next') -Force | Out-Null
+    New-Item -ItemType Directory -Path $source, (Join-Path $hostRoot 'app'), (Join-Path $hostRoot 'data') -Force | Out-Null
     '{}' | Set-Content (Join-Path $hostRoot 'host.json')
-    ('a' * 40) | Set-Content (Join-Path $hostRoot 'data/app/.next/BIRD_APP_VERSION')
-    Copy-Item (Join-Path $PSScriptRoot '../deploy/Migrate-Host.ps1') $source
+    ('a' * 40) | Set-Content (Join-Path $hostRoot 'app/.birdbrain-version')
+    ((Get-Content (Join-Path $PSScriptRoot '../deploy/Migrate-Host.ps1') -Raw) -replace '#Requires -RunAsAdministrator', '') | Set-Content (Join-Path $source 'Migrate-Host.ps1')
     'function Stop-BirdBrain($Root) { $global:migrationEvents.Add("stop") }; function Start-BirdBrain($Root, $Commit) { $global:migrationEvents.Add("verify") }' | Set-Content (Join-Path $source 'Service.ps1')
     'function Initialize-AppEnvironment($Root) { $global:migrationEvents.Add("environment") }; function Remove-LegacyDeployment($Root, [scriptblock]$Verify) { & $Verify; $global:migrationEvents.Add("cleanup") }' | Set-Content (Join-Path $source 'LegacyCleanup.ps1')
     '# checkout' | Set-Content (Join-Path $source 'CheckoutDeployment.ps1')

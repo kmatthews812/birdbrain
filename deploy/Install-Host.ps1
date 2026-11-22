@@ -43,11 +43,17 @@ Invoke-Checked icacls.exe @($root, '/inheritance:r', '/grant:r',
     '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F', '*S-1-5-19:(OI)(CI)RX',
     "*${sid}:(OI)(CI)RX")
 
-$data = Join-Path $root 'data'
+$data = Join-Path $root 'logs'
+$app = Join-Path $root 'app'
 $serviceLogs = Join-Path $root 'service-logs'
-New-Item -Path $data, $serviceLogs -ItemType Directory -Force | Out-Null
+New-Item -Path $data, $app, $serviceLogs -ItemType Directory -Force | Out-Null
+Invoke-Checked icacls.exe @($app, '/grant:r', "*${sid}:(OI)(CI)M")
 Invoke-Checked icacls.exe @($data, '/grant:r', "*${sid}:(OI)(CI)M")
 Invoke-Checked icacls.exe @($serviceLogs, '/grant:r', '*S-1-5-19:(OI)(CI)M')
+$cache = Join-Path $app '.next'
+New-Item -Path $cache -ItemType Directory -Force | Out-Null
+Invoke-Checked icacls.exe @($cache, '/grant:r', '*S-1-5-19:(OI)(CI)M')
+Invoke-Checked icacls.exe @($app, '/setowner', "*$sid", '/T')
 Copy-Item -LiteralPath @(
     (Join-Path $PSScriptRoot 'Deploy.ps1'),
     (Join-Path $PSScriptRoot 'CheckoutDeployment.ps1'),
@@ -78,7 +84,7 @@ $nodeXml = [Security.SecurityElement]::Escape($Node)
   <executable>$nodeXml</executable>
   <arguments>"%BASE%\Start-BirdBrain.mjs" "%BASE%"</arguments>
   <workingdirectory>%BASE%</workingdirectory>
-  <env name="NODE_ENV" value="production"/>
+  <env name="NODE_ENV" value="development"/>
   <env name="NEXT_TELEMETRY_DISABLED" value="1"/>
   <env name="BIRDNET_BASE_URL" value="http://127.0.0.1:8080"/>
   <serviceaccount><username>NT AUTHORITY\LocalService</username></serviceaccount>

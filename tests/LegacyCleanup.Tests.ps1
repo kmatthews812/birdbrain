@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../deploy/LegacyCleanup.ps1')
 $root = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString())
 $legacy = Join-Path $root ('data/releases/' + ('a' * 40))
-$app = Join-Path $root 'data/app'
+$app = Join-Path $root 'app'
 try {
     New-Item -ItemType Directory -Path $legacy -Force | Out-Null
     [IO.File]::WriteAllText((Join-Path $legacy '.env.local'), "OPENAI_API_KEY=keep-this-test-value`r`n")

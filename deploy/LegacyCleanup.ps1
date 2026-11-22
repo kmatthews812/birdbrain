@@ -8,7 +8,7 @@ function Get-LegacyEnvironmentFiles($Root) {
 }
 
 function Initialize-AppEnvironment($Root) {
-    $app = Join-Path $Root 'data/app'
+    $app = Join-Path $Root 'app'
     $destination = Join-Path $app '.env.local'
     $files = @(Get-LegacyEnvironmentFiles $Root)
     if (@($files | Where-Object { $_.Name -ne '.env.local' }).Count -gt 0) {
@@ -28,7 +28,7 @@ function Initialize-AppEnvironment($Root) {
 function Remove-LegacyDeployment($Root, [scriptblock]$Verify) {
     & $Verify
     Initialize-AppEnvironment $Root
-    foreach ($relative in @('data/releases', 'data/repository.git', 'data/state.json', 'ReleaseState.ps1')) {
+    foreach ($relative in @('data', 'ReleaseState.ps1')) {
         $path = Join-Path $Root $relative
         if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Recurse -Force }
     }

@@ -3,8 +3,8 @@ $root = $PSScriptRoot
 . (Join-Path $root 'CheckoutDeployment.ps1')
 . (Join-Path $root 'Service.ps1')
 $config = Get-Content -LiteralPath (Join-Path $root 'host.json') -Raw | ConvertFrom-Json
-$data = Join-Path $root 'data'
-$app = Join-Path $data 'app'
+$data = Join-Path $root 'logs'
+$app = Join-Path $root 'app'
 $log = Join-Path $data "deploy-$(Get-Date -Format yyyy-MM-dd).log"
 $env:GIT_TERMINAL_PROMPT = '0'
 $env:GCM_INTERACTIVE = 'Never'
@@ -28,12 +28,12 @@ try {
     Invoke-CheckoutDeployment $app $config.git $config.remote $config.branch `
         { Stop-BirdBrain $root } `
         {
-            param($path)
+            param($path, $install)
             Push-Location -LiteralPath $path
             try {
-                Invoke-Step $config.npm @('ci', '--no-audit', '--no-fund')
+                if ($install) { Invoke-Step $config.npm @('ci', '--no-audit', '--no-fund') }
                 Invoke-Step $config.npm @('test')
-                Invoke-Step $config.npm @('run', 'build')
+                & (Join-Path $path 'tests/Run-DeploymentTests.ps1') *>> $log
             } finally { Pop-Location }
         } `
         { param($commit) Start-BirdBrain $root $commit }

@@ -15,8 +15,21 @@ try {
         if ((Get-Date) -ge $until) { throw 'A deployment is still running. Retry migration after it finishes.' }
         Start-Sleep -Seconds 2
     }
-    $lock = [IO.File]::Open((Join-Path $Root 'data/deploy.lock'), 'OpenOrCreate', 'ReadWrite', 'None')
+    $lockPath = if (Test-Path (Join-Path $Root 'data')) { Join-Path $Root 'data/deploy.lock' } else { Join-Path $Root 'logs/deploy.lock' }
+    $lock = [IO.File]::Open($lockPath, 'OpenOrCreate', 'ReadWrite', 'None')
     Initialize-AppEnvironment $Root
+    $account = $task.Principal.UserId
+    if ($account -match '^S-1-') { $account = "*$account" }
+    foreach ($directory in @('app', 'logs')) {
+        $path = Join-Path $Root $directory
+        New-Item -ItemType Directory -Path $path -Force | Out-Null
+        & icacls.exe $path /grant "${account}:(OI)(CI)M" | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Could not grant deployment access to the app and logs.' }
+    }
+    $cache = Join-Path $Root 'app/.next'
+    New-Item -ItemType Directory -Path $cache -Force | Out-Null
+    & icacls.exe $cache /grant '*S-1-5-19:(OI)(CI)M' | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Could not grant LocalService access to the Next development cache.' }
     Stop-BirdBrain $Root
     foreach ($name in @('Deploy.ps1', 'CheckoutDeployment.ps1', 'Service.ps1', 'LegacyCleanup.ps1', 'Start-BirdBrain.mjs')) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $Root $name) -Force
@@ -24,14 +37,14 @@ try {
     $lock.Dispose(); $lock = $null
     & (Join-Path $Root 'Deploy.ps1')
     Remove-LegacyDeployment $Root {
-        $commit = (Get-Content -LiteralPath (Join-Path $Root 'data/app/.next/BIRD_APP_VERSION') -Raw).Trim()
+        $commit = (Get-Content -LiteralPath (Join-Path $Root 'app/.birdbrain-version') -Raw).Trim()
         Start-BirdBrain $Root $commit
     }
-    Write-Host "Migration complete. One app checkout: $Root\data\app"
-    Write-Host "Server configuration: $Root\data\app\.env.local"
+    Write-Host "Migration complete. One app checkout: $Root\app"
+    Write-Host "Server configuration: $Root\app\.env.local"
 } finally {
     if ($lock) { $lock.Dispose() }
-    $app = Join-Path $Root 'data/app'
+    $app = Join-Path $Root 'app'
     try {
         if (Test-Path -LiteralPath $app) {
             $owner = $task.Principal.UserId
