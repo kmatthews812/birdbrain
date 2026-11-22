@@ -24,3 +24,11 @@ test('tool errors are actionable and cancellation stops future calls', async () 
   await assert.rejects(tools.search({ prompt: 'hello' }), { name: 'AbortError' });
   assert.equal(calls, 1);
 });
+
+test('playSound ties audio playback to the visualization lifetime', async () => {
+  const controller = new AbortController();
+  const calls = [];
+  const tools = createTools({ signal: controller.signal, sound: { play: async (...args) => { calls.push(args); return true; } } });
+  assert.equal(await tools.playSound('/sounds/chirp.wav'), true);
+  assert.deepEqual(calls, [['/sounds/chirp.wav', controller.signal]]);
+});

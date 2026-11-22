@@ -4,8 +4,21 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { readDetection, shouldReload } from '../lib/detections.mjs';
 import { selectVisualization, visualizations } from '../visualizations/index.jsx';
 import Player from './player.jsx';
+import { createSound } from '../lib/sound.mjs';
 
 export default function Board({ version }) {
+  const [sound] = useState(() => createSound());
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [soundError, setSoundError] = useState('');
+  useEffect(() => () => { sound.dispose(); }, [sound]);
+  async function toggleSound() {
+    try {
+      if (soundEnabled) sound.mute();
+      else await sound.enable();
+      setSoundEnabled(!soundEnabled);
+      setSoundError('');
+    } catch { setSoundError('Sound could not start. Tap to try again.'); }
+  }
   const [online, setOnline] = useState(false);
   const [bird, setBird] = useState(null);
   const [sequence, setSequence] = useState(0);
@@ -65,11 +78,15 @@ export default function Board({ version }) {
         <p><i data-online={online} />{online ? 'Live' : 'Connecting'}</p>
       </header>
       <section aria-live="polite">
-        {bird && visualization ? <Player key={sequence} visualization={visualization} bird={bird} onDone={finish} /> : <>
+        {bird && visualization ? <Player key={sequence} visualization={visualization} bird={bird} onDone={finish} sound={sound} /> : <>
           <div className="rings" aria-hidden="true" />
           <div className="caption"><h2>Listening for owls</h2></div>
         </>}
       </section>
+      <footer>
+        <button type="button" onClick={toggleSound} aria-pressed={soundEnabled}>{soundEnabled ? 'Mute sound' : 'Enable sound'}</button>
+        {soundError && <p role="status">{soundError}</p>}
+      </footer>
     </main>
   );
 }

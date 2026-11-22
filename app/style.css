@@ -17,3 +17,7 @@ h2 { font: normal clamp(2.2rem, 7vw, 6rem)/1.04 "Instrument Serif", Georgia, ser
 @keyframes call { from { transform: scale(.75); opacity: .35; } to { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .rings[data-detected="true"] { animation: none; } }
 .credit { position: absolute; bottom: 0; left: 0; right: 0; color: #bbd7d1; font-size: .85rem; }
+main { grid-template-rows: auto 1fr auto; }
+footer { padding-top: 2rem; text-align: center; }
+button { font: inherit; color: inherit; background: #27484b; border: 1px solid #76a39c; border-radius: 2rem; padding: .7rem 1.2rem; cursor: pointer; min-height: 44px; }
+button:focus-visible { outline: 3px solid #e0ad86; outline-offset: 3px; }

@@ -23,6 +23,8 @@ test('live detections play credited visualizations once and return to listening 
   globalThis.window = dom.window;
   globalThis.document = dom.window.document;
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  let resumed = 0;
+  window.AudioContext = class { async resume() { resumed++; } async close() {} };
   let source;
   globalThis.EventSource = class extends dom.window.EventTarget {
     constructor(url) { super(); this.url = url; source = this; }
@@ -35,6 +37,13 @@ test('live detections play credited visualizations once and return to listening 
   try {
     await act(() => root.render(<Board version="test" />));
     assert.equal(source.url, '/api/birds/stream');
+    const soundButton = document.querySelector('button');
+    assert.equal(soundButton?.textContent, 'Enable sound');
+    await act(() => soundButton.click());
+    assert.equal(resumed, 1);
+    assert.equal(soundButton.textContent, 'Mute sound');
+    await act(() => soundButton.click());
+    assert.equal(soundButton.textContent, 'Enable sound');
     await act(() => source.emit('connected', {}));
     assert.equal(document.querySelector('header p').textContent, 'Live');
     const bird = { id: 42, commonName: 'Robin', confidence: 0.9 };
