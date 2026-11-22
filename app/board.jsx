@@ -1,20 +1,33 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { readDetection, shouldReload } from '../lib/detections.mjs';
+import { selectVisualization, visualizations } from '../visualizations/index.jsx';
+import Player from './player.jsx';
 
 export default function Board({ version }) {
   const [online, setOnline] = useState(false);
   const [bird, setBird] = useState(null);
   const [sequence, setSequence] = useState(0);
+  const [visualization, setVisualization] = useState(null);
+  const previous = useRef(null);
+  const finish = useCallback(() => setBird(null), []);
 
   useEffect(() => {
     const stream = new EventSource('/api/birds/stream');
+    const seen = new Set();
     stream.addEventListener('connected', () => setOnline(true));
     stream.onerror = () => setOnline(false);
     stream.addEventListener('detection', (event) => {
       const detection = readDetection(event.data);
-      if (!detection) return;
+      if (!detection || (detection.id != null && seen.has(detection.id))) return;
+      if (detection.id != null) {
+        seen.add(detection.id);
+        if (seen.size > 100) seen.delete(seen.values().next().value);
+      }
+      const next = selectVisualization(visualizations, previous.current);
+      previous.current = next?.id;
+      setVisualization(next);
       setBird(detection);
       setSequence((value) => value + 1);
     });
@@ -52,11 +65,10 @@ export default function Board({ version }) {
         <p><i data-online={online} />{online ? 'Live' : 'Connecting'}</p>
       </header>
       <section aria-live="polite">
-        <div className="rings" key={sequence} data-detected={Boolean(bird)} aria-hidden="true" />
-        <div className="caption">
-          <h2>{bird ? bird.commonName : 'Listening for owls'}</h2>
-          {bird && <p>{Math.round(bird.confidence * 100)}% confidence</p>}
-        </div>
+        {bird && visualization ? <Player key={sequence} visualization={visualization} bird={bird} onDone={finish} /> : <>
+          <div className="rings" aria-hidden="true" />
+          <div className="caption"><h2>Listening for owls</h2></div>
+        </>}
       </section>
     </main>
   );

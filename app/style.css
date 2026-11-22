@@ -16,3 +16,4 @@ h2 { font: normal clamp(2.2rem, 7vw, 6rem)/1.04 "Instrument Serif", Georgia, ser
 .caption p { color: #bbd7d1; margin: 1rem 0 0; }
 @keyframes call { from { transform: scale(.75); opacity: .35; } to { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .rings[data-detected="true"] { animation: none; } }
+.credit { position: absolute; bottom: 0; left: 0; right: 0; color: #bbd7d1; font-size: .85rem; }
