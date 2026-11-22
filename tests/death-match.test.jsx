@@ -17,6 +17,7 @@ async function mount(t, image, opponent = previousBird, strict = false) {
   t.after(async () => { controller.abort(); await act(() => root.unmount()); dom.window.close(); });
   const view = <CelebrityDeathMatch bird={bird} previousBird={opponent} tools={{ image }} signal={controller.signal} />;
   await act(() => root.render(strict ? <React.StrictMode>{view}</React.StrictMode> : view));
+  controller.regenerate = () => act(() => root.render(React.cloneElement(view, { key: 'regenerated' })));
   return controller;
 }
 
@@ -76,4 +77,17 @@ test('makes one image request during development StrictMode effect replay', asyn
   await mount(t, async () => { calls++; return { data: [{ b64_json: 'R0lGODlh' }] }; }, previousBird, true);
   assert.equal(calls, 1);
   assert.equal(document.querySelector('img').getAttribute('src'), 'data:image/gif;base64,R0lGODlh');
+});
+
+test('regenerating the same bird uses different creative scene and choreography instructions', async t => {
+  t.mock.method(Math, 'random', () => 0);
+  const prompts = [];
+  const controller = await mount(t, async input => { prompts.push(input.prompt); return { data: [{ b64_json: 'R0lGODlh' }] }; });
+  await controller.regenerate();
+  assert.equal(prompts.length, 2);
+  assert.notEqual(prompts[0], prompts[1]);
+  for (const prompt of prompts) {
+    assert.match(prompt, /Scene variation:/);
+    assert.match(prompt, /American Crow/);
+  }
 });
