@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-export default function RecentHistory({ detection, onSelect }) {
+export default function RecentHistory({ detection, onSelect, onHistory }) {
   const [birds, setBirds] = useState([]);
   const [status, setStatus] = useState('loading');
   const [attempt, setAttempt] = useState(0);
@@ -18,6 +18,7 @@ export default function RecentHistory({ detection, onSelect }) {
     return () => controller.abort();
   }, [attempt]);
   useEffect(() => { if (detection) setBirds(current => mergeRecent(current, [detection])); }, [detection]);
+  useEffect(() => { onHistory?.({ status, latest: birds[0] }); }, [birds, status, onHistory]);
   return <aside className="recent-history" aria-labelledby="recent-title">
     <div className="recent-heading"><h2 id="recent-title">Recent sightings</h2><p>Tap a bird to play</p></div>
     {status === 'loading' && <p className="recent-status">Loading recent sightings…</p>}

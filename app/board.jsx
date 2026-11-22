@@ -5,6 +5,7 @@ import { readDetection, shouldReload } from '../lib/detections.mjs';
 import { selectVisualization, visualizations } from '../visualizations/index.jsx';
 import Player from './player.jsx';
 import RecentHistory from './recent-history.jsx';
+import ListeningStatus from './listening-status.jsx';
 import { createSound } from '../lib/sound.mjs';
 
 export default function Board({ version }) {
@@ -22,6 +23,16 @@ export default function Board({ version }) {
   }
   const [online, setOnline] = useState(false);
   const [latestDetection, setLatestDetection] = useState(null);
+  const [lastSighting, setLastSighting] = useState(null);
+  const [recentStatus, setRecentStatus] = useState('loading');
+  const updateLastSighting = useCallback(timestamp => {
+    if (!Number.isFinite(Date.parse(timestamp))) return;
+    setLastSighting(current => !current || Date.parse(timestamp) > Date.parse(current) ? timestamp : current);
+  }, []);
+  const onHistory = useCallback(({ status, latest }) => {
+    setRecentStatus(status);
+    updateLastSighting(latest?.timestamp);
+  }, [updateLastSighting]);
   const [bird, setBird] = useState(null);
   const [sequence, setSequence] = useState(0);
   const [visualization, setVisualization] = useState(null);
@@ -83,6 +94,7 @@ export default function Board({ version }) {
       }
       setSeenBirds(current => mergeBirds(current, [detection]));
       setLatestDetection(detection);
+      updateLastSighting(detection.timestamp);
       play(detection);
     });
 
@@ -107,7 +119,7 @@ export default function Board({ version }) {
       document.removeEventListener('visibilitychange', checkVersion);
       stream.close();
     };
-  }, [version, play]);
+  }, [version, play, updateLastSighting]);
 
   return (
     <main>
@@ -143,10 +155,10 @@ export default function Board({ version }) {
         <section aria-live="polite">
           {bird && visualization ? <Player key={sequence} visualization={visualization} bird={bird} previousBird={previousBird} sound={sound} /> : <>
             <div className="rings" aria-hidden="true" />
-            <div className="caption"><h2>Listening for owls</h2></div>
+            <ListeningStatus timestamp={lastSighting} loading={recentStatus === 'loading'} error={recentStatus === 'error'} />
           </>}
         </section>
-        <RecentHistory detection={latestDetection} onSelect={detection => play(detection, true)} />
+        <RecentHistory onHistory={onHistory} detection={latestDetection} onSelect={detection => play(detection, true)} />
       </div>
       <footer>
         <button type="button" onClick={toggleSound} aria-pressed={soundEnabled}>{soundEnabled ? 'Mute sound' : 'Enable sound'}</button>
