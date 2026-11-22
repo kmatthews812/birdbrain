@@ -4,7 +4,7 @@ function Invoke-CheckoutGit($Git, $App, [string[]]$Arguments) {
     return $output
 }
 
-function Invoke-CheckoutDeployment($App, $Git, $Remote, $Branch, [scriptblock]$Stop, [scriptblock]$Build, [scriptblock]$Start) {
+function Invoke-CheckoutDeployment($App, $Git, $Remote, $Branch, [scriptblock]$Stop, [scriptblock]$Prepare, [scriptblock]$Start) {
     if (-not (Test-Path -LiteralPath (Join-Path $App '.git'))) {
         New-Item -ItemType Directory -Path $App -Force | Out-Null
         Invoke-CheckoutGit $Git $App @('init', '-b', $Branch) | Out-Null
@@ -25,22 +25,31 @@ function Invoke-CheckoutDeployment($App, $Git, $Remote, $Branch, [scriptblock]$S
         & $Git -C $App merge-base --is-ancestor HEAD $commit
         if ($LASTEXITCODE -ne 0) { throw 'The app checkout has diverged; refusing a non-fast-forward update.' }
     }
-    $marker = Join-Path $App '.next/BIRD_APP_VERSION'
-    if ($hasHead -and (Test-Path -LiteralPath $marker) -and
-        (Get-Content -LiteralPath $marker -Raw).Trim() -ceq $commit) {
+    $marker = Join-Path $App '.birdbrain-version'
+    $accepted = if (Test-Path -LiteralPath $marker) { (Get-Content -LiteralPath $marker -Raw).Trim() } else { $null }
+    if ($accepted -and $accepted -cnotmatch '^[0-9a-f]{40}$') { throw 'Invalid accepted version marker.' }
+    if ($hasHead -and $accepted -ceq $commit) {
         & $Start $commit
         return
     }
-    & $Stop
-    if (Test-Path -LiteralPath $marker) { Remove-Item -LiteralPath $marker -Force }
-    if ($hasHead) {
-        Invoke-CheckoutGit $Git $App @('merge', '--ff-only', $commit) | Out-Null
-    } else {
-        Invoke-CheckoutGit $Git $App @('checkout', '-b', $Branch, $commit) | Out-Null
+    $install = -not $accepted -or -not (Test-Path -LiteralPath (Join-Path $App 'node_modules'))
+    if (-not $install) {
+        $install = [bool](Invoke-CheckoutGit $Git $App @('diff', '--name-only', $accepted, $commit, '--', 'package.json', 'package-lock.json'))
     }
-    & $Git -C $App check-ignore -q .env.local
-    if ($LASTEXITCODE -ne 0) { throw '.env.local must remain Git-ignored.' }
-    & $Build $App
-    Set-Content -LiteralPath $marker -Value $commit -Encoding Ascii
-    & $Start $commit
+    try {
+        if ($install) { & $Stop }
+        if ($hasHead) {
+            Invoke-CheckoutGit $Git $App @('merge', '--ff-only', $commit) | Out-Null
+        } else {
+            Invoke-CheckoutGit $Git $App @('checkout', '-b', $Branch, $commit) | Out-Null
+        }
+        & $Git -C $App check-ignore -q .env.local
+        if ($LASTEXITCODE -ne 0) { throw '.env.local must remain Git-ignored.' }
+        & $Prepare $App $install
+        Set-Content -LiteralPath $marker -Value $commit -Encoding Ascii
+        & $Start $commit
+    } catch {
+        & $Stop
+        throw
+    }
 }
