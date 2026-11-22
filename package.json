@@ -8,7 +8,8 @@
   "scripts": {
     "build": "next build",
     "test": "node --import tsx --test tests/*.test.mjs tests/*.test.jsx",
-    "start": "next start"
+    "start": "next start",
+    "dev": "next dev"
   },
   "dependencies": {
     "next": "16.4.6",

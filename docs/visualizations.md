@@ -111,10 +111,10 @@ Copy `.env.example` to `.env.local` on the Mac, add `OPENAI_API_KEY` locally whe
 ready, and restart Next.js. `.env.local` is ignored by Git. Model defaults can be
 overridden with `OPENAI_MODEL` and `OPENAI_IMAGE_MODEL`.
 
-On Windows, set these as system environment variables available to the BirdBrain
-service, then reboot so the service receives the updated environment. Do not put
-secrets in Git or a commit-specific release directory: deployments replace releases.
-The installed service already sets `BIRDNET_BASE_URL=http://127.0.0.1:8080`.
+On Windows, put these in `C:\ProgramData\BirdBrain\app\.env.local`. The single
+checkout retains this Git-ignored file across pulls, and Next dev reloads environment
+changes. The installed service sets `BIRDNET_BASE_URL=http://127.0.0.1:8080`.
+Never commit secrets. No system environment variable or Windows reboot is needed.
 
 Until a key is configured, AI tools report “Set OPENAI_API_KEY on the BirdBrain
 server to enable this tool.” BirdNET events, REST queries, local visuals, and sound
