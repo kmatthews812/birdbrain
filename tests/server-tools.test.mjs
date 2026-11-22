@@ -92,3 +92,41 @@ test('accepts LAN origins matching the request Host when Next uses an internal U
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {result:{status:'healthy'}});
 });
+
+test('generates text through Responses using a server-only API key and configurable model', async () => {
+  const result = {id:'resp_1',output:[{type:'message',content:[{type:'output_text',text:'A cheerful robin.'}]}]};
+  const response = await handleToolRequest(request({tool:'generate',input:{prompt:'Describe a robin.'}}), {
+    env:{OPENAI_API_KEY:'server-secret',OPENAI_MODEL:'custom-model'},
+    fetch:async (url, options) => {
+      assert.equal(String(url), 'https://api.openai.com/v1/responses');
+      assert.equal(options.method, 'POST');
+      assert.deepEqual(options.headers, {'Content-Type':'application/json',Authorization:'Bearer server-secret'});
+      assert.deepEqual(JSON.parse(options.body), {model:'custom-model',input:'Describe a robin.',store:false});
+      assert.equal(options.signal.aborted, false);
+      assert.equal(options.redirect, 'error');
+      return Response.json(result);
+    },
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {result});
+});
+
+test('reports missing OpenAI configuration without making a paid request', async () => {
+  const response = await handleToolRequest(request({tool:'generate',input:{prompt:'Bird fact'}}), {env:{},fetch:() => assert.fail('must not fetch')});
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), {error:'Set OPENAI_API_KEY on the BirdBrain server to enable this tool.'});
+});
+
+test('rejects invalid prompts before making a paid request', async () => {
+  for (const prompt of [null, '', '   ', 42, 'a'.repeat(12001)]) {
+    const response = await handleToolRequest(request({tool:'generate',input:{prompt}}), {env:{OPENAI_API_KEY:'key'},fetch:() => assert.fail('must not fetch')});
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), {error:'Provide a prompt between 1 and 12000 characters.'});
+  }
+});
+
+test('does not expose OpenAI error bodies or credentials', async () => {
+  const response = await handleToolRequest(request({tool:'generate',input:{prompt:'Bird fact'}}), {env:{OPENAI_API_KEY:'key'},fetch:async () => new Response('key leaked', {status:401})});
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), {error:'The upstream service could not complete this request.'});
+});
