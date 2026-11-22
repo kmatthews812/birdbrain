@@ -47,6 +47,9 @@ export default function Board({ version }) {
   const cached = useRef([]);
   const setEntries = useCallback(update => {
     cached.current = typeof update === 'function' ? update(cached.current) : update;
+    const completed = cached.current.filter(item => item.ready && !item.queued && item !== displayed.current);
+    const retained = new Set(completed.slice(-(displayed.current?.ready ? 29 : 30)));
+    cached.current = cached.current.filter(item => !item.ready || item.queued || item === displayed.current || retained.has(item));
     renderEntries(cached.current);
   }, []);
   const manualMode = useRef(false);

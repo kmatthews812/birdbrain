@@ -503,3 +503,14 @@ test('clicking a live queued bird reveals its existing in-progress view immediat
   assert.equal(document.querySelector('[data-playback]:not([hidden]) h2') === prepared, true);
   assert.deepEqual(mounts, [42, 43]);
 });
+
+test('keeps queued views intact and retains only thirty completed views for manual browsing', async t => {
+  const { source } = await mountBoard(t);
+  await act(() => document.querySelector('#randomize').click());
+  for (let id = 1; id <= 35; id++) await act(() => source.emit('detection', { ...robin, id }));
+  assert.equal(document.querySelectorAll('[data-playback]').length, 35);
+  for (let i = 0; i < 34; i++) await act(() => t.mock.timers.tick(30000));
+  assert.equal(document.querySelectorAll('[data-playback]').length, 30);
+  assert.equal(document.querySelector('[data-playback="1"]'), null);
+  assert.equal(document.querySelector('[data-playback]:not([hidden])').getAttribute('data-playback'), '35');
+});
