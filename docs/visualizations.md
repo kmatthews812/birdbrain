@@ -15,6 +15,10 @@ Death Match with Randomize unchecked, then preview the second bird. Live events
 received during previews still update the preceding bird for the next matchup.
 The matchup remains visible until another detection or manual selection replaces it. Each matchup generates a new GIF and incurs an image API charge.
 
+**Bird Dance**, by Kevin, generates a fresh looping GIF of the current species
+doing a cheerful dance. It needs no previous bird and remains visible until
+another detection or manual selection replaces it.
+
 The upper-right selector chooses a specific visualization when **Randomize** is
 unchecked. Randomize is checked by default. Choose a previously seen species and
 press **Show bird** to preview it. Manual previews remain visible until the next live

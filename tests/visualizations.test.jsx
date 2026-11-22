@@ -23,7 +23,7 @@ test('registered visualizations declare unique IDs, credits, components', () => 
     assert.match(v.createdBy, /\S/);
     assert.equal(typeof v.Component, 'function');
   }
-  assert.deepEqual(visualizations.map(({ id, name, createdBy }) => ({ id, name, createdBy })), [{ id: 'default-view', name: 'Default View', createdBy: 'Kevin' }, { id: 'celebrity-death-match', name: 'Celebrity Death Match', createdBy: 'Kevin' }]);
+  assert.deepEqual(visualizations.map(({ id, name, createdBy }) => ({ id, name, createdBy })), [{ id: 'default-view', name: 'Default View', createdBy: 'Kevin' }, { id: 'celebrity-death-match', name: 'Celebrity Death Match', createdBy: 'Kevin' }, { id: 'bird-dance', name: 'Bird Dance', createdBy: 'Kevin' }]);
 });
 
 test('player passes bird and tools, credits the author, and cleans up when replaced', async () => {
