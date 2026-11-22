@@ -8,7 +8,7 @@ import Board from '../app/board.jsx';
 import { visualizations } from '../visualizations/index.jsx';
 
 const robin = { id: 42, commonName: 'Robin', scientificName: 'Turdus migratorius', confidence: 0.9 };
-async function mountBoard(t, fetcher = async (url) => Response.json(url === '/api/birds/history' ? { birds: [] } : { version: 'test' })) {
+async function mountBoard(t, fetcher = async (url) => Response.json(url === '/api/birds/history' ? { birds: [] } : { version: 'test' }), recent = []) {
   t.mock.method(Math, 'random', () => 0);
   const dom = new JSDOM('<div id="root"></div>');
   globalThis.window = dom.window;
@@ -22,6 +22,7 @@ async function mountBoard(t, fetcher = async (url) => Response.json(url === '/ap
     emit(type, data) { this.dispatchEvent(new dom.window.MessageEvent(type, { data: JSON.stringify(data) })); }
   };
   t.mock.method(globalThis, 'fetch', (url, options) => {
+    if (url === '/api/birds/recent') return Promise.resolve(Response.json({ birds: recent }));
     if (url === '/api/birds/fact') return Promise.resolve(Response.json({ fact: 'A bird fact.', sources: [] }));
     if (url.includes('info=1')) return Promise.resolve(Response.json({}));
     return fetcher(url, options);
@@ -163,4 +164,24 @@ test('passes the preceding bird to a visualization, ignoring duplicate events an
   await act(() => source.emit('detection', next));
   assert.deepEqual(received.at(-1).bird, next);
   assert.deepEqual(received.at(-1).previousBird, owl);
+});
+
+
+test('recent sidebar clicks use the selected visualization and live detections appear during manual playback', async t => {
+  const selected = [];
+  visualizations.push({ id: 'sidebar-test', name: 'Sidebar test', createdBy: 'Test', durationMs: 60000, Component: ({ bird }) => { selected.push(bird); return <h2>{bird.commonName}</h2>; } });
+  t.after(() => visualizations.pop());
+  const { source, change } = await mountBoard(t, undefined, [robin]);
+  assert.equal(document.querySelector('section h2').textContent, 'Listening for owls');
+  await act(() => document.querySelector('#randomize').click());
+  await change(document.querySelector('#visualization'), 'sidebar-test');
+  await act(() => document.querySelector('aside li button').click());
+  assert.deepEqual(selected.at(-1), robin);
+  assert.equal(document.querySelector('.preview-status').textContent, 'Manual preview');
+  const crow = { id: 43, commonName: 'American Crow', scientificName: 'Corvus brachyrhynchos', confidence: .95, timestamp: '2026-11-23T00:00:00Z' };
+  await act(() => source.emit('detection', crow));
+  assert.deepEqual([...document.querySelectorAll('.recent-name')].map(el => el.textContent), ['American Crow', 'Robin']);
+  assert.deepEqual(selected.at(-1), robin);
+  await act(() => document.querySelector('aside li button').click());
+  assert.deepEqual(selected.at(-1), crow);
 });

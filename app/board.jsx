@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { readDetection, shouldReload } from '../lib/detections.mjs';
 import { selectVisualization, visualizations } from '../visualizations/index.jsx';
 import Player from './player.jsx';
+import RecentHistory from './recent-history.jsx';
 import { createSound } from '../lib/sound.mjs';
 
 export default function Board({ version }) {
@@ -20,6 +21,7 @@ export default function Board({ version }) {
     } catch { setSoundError('Sound could not start. Tap to try again.'); }
   }
   const [online, setOnline] = useState(false);
+  const [latestDetection, setLatestDetection] = useState(null);
   const [bird, setBird] = useState(null);
   const [sequence, setSequence] = useState(0);
   const [visualization, setVisualization] = useState(null);
@@ -83,6 +85,7 @@ export default function Board({ version }) {
         if (seen.size > 100) seen.delete(seen.values().next().value);
       }
       setSeenBirds(current => mergeBirds(current, [detection]));
+      setLatestDetection(detection);
       if (!previewing.current) play(detection);
       else lastBird.current = detection;
     });
@@ -140,12 +143,15 @@ export default function Board({ version }) {
         {historyStatus === 'error' && <><span className="history-status">Could not load previously seen birds.</span><button id="retry-history" type="button" onClick={() => setHistoryAttempt(value => value + 1)}>Retry</button></>}
         {historyStatus === 'ready' && !seenBirds.length && <span className="history-status">No birds recorded yet.</span>}
       </div>
-      <section aria-live="polite">
-        {bird && visualization ? <Player key={sequence} visualization={visualization} bird={bird} previousBird={previousBird} onDone={finish} sound={sound} /> : <>
-          <div className="rings" aria-hidden="true" />
-          <div className="caption"><h2>Listening for owls</h2></div>
-        </>}
-      </section>
+      <div className="display-layout">
+        <section aria-live="polite">
+          {bird && visualization ? <Player key={sequence} visualization={visualization} bird={bird} previousBird={previousBird} onDone={finish} sound={sound} /> : <>
+            <div className="rings" aria-hidden="true" />
+            <div className="caption"><h2>Listening for owls</h2></div>
+          </>}
+        </section>
+        <RecentHistory detection={latestDetection} onSelect={detection => play(detection, true)} />
+      </div>
       <footer>
         <button type="button" onClick={toggleSound} aria-pressed={soundEnabled}>{soundEnabled ? 'Mute sound' : 'Enable sound'}</button>
         {soundError && <p role="status">{soundError}</p>}
