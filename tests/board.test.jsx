@@ -49,7 +49,7 @@ test('starts listening with named visualization disabled and Randomize checked',
   dom.window.close();
 });
 
-test('live detections play credited visualizations once, with sound controls and timed return to listening', async (t) => {
+test('live detections play credited visualizations once, with sound controls and persist until replaced', async (t) => {
   const { source, resumed } = await mountBoard(t);
   assert.equal(source.url, '/api/birds/stream');
   const sound = document.querySelector('footer button');
@@ -62,16 +62,20 @@ test('live detections play credited visualizations once, with sound controls and
   await act(() => source.emit('detection', robin));
   assert.equal(document.querySelector('h2').textContent, 'Robin');
   assert.equal(document.querySelector('.credit').textContent, 'Default View · Created by Kevin');
-  await act(() => t.mock.timers.tick(visualizations[0].durationMs - 1000));
+  await act(() => t.mock.timers.tick(3600000));
   await act(() => source.emit('detection', robin));
-  await act(() => t.mock.timers.tick(1000));
-  assert.equal(document.querySelector('h2').textContent, 'Listening for owls');
+  const displayed = document.querySelector('section article');
+  await act(() => source.emit('detection', robin));
+  assert.equal(document.querySelector('section article'), displayed);
+  assert.equal(document.querySelector('h2').textContent, 'Robin');
+  await act(() => source.emit('detection', { ...robin, id: 43, commonName: 'Crow' }));
+  assert.match(document.querySelector('h2').textContent, /Crow/);
   await act(() => source.onerror());
   assert.equal(document.querySelector('.connection').textContent, 'Connecting');
 });
 
 test('unchecked Randomize uses the chosen visualization for every event; checking resumes random selection', async (t) => {
-  visualizations.push({ id: 'test-view', name: 'Test View', createdBy: 'Test', durationMs: 20000, Component: ({ bird }) => <h2>Test: {bird.commonName}</h2> });
+  visualizations.push({ id: 'test-view', name: 'Test View', createdBy: 'Test', Component: ({ bird }) => <h2>Test: {bird.commonName}</h2> });
   t.after(() => visualizations.pop());
   t.mock.method(Math, 'random', () => 0);
   const { source, change } = await mountBoard(t);
@@ -104,17 +108,22 @@ test('manually previews a historical bird with the selected view, then resumes l
   await act(() => show.click());
   assert.equal(document.querySelector('h2').textContent, 'Common Raven');
   assert.equal(document.querySelector('.preview-status').textContent, 'Manual preview');
-  await act(() => source.emit('detection', robin));
+  await act(() => t.mock.timers.tick(3600000));
   assert.equal(document.querySelector('h2').textContent, 'Common Raven');
+  await act(() => source.emit('detection', robin));
+  assert.equal(document.querySelector('h2').textContent, 'Robin');
+  assert.equal(document.querySelector('#back-to-live'), null);
+  await act(() => show.click());
   assert.deepEqual([...select.options].map(option => option.textContent), ['Choose a bird…', 'Common Raven', 'Robin']);
   await act(() => document.querySelector('#back-to-live').click());
   assert.equal(document.querySelector('h2').textContent, 'Listening for owls');
   await act(() => source.emit('detection', { ...robin, id: 43 }));
   assert.equal(document.querySelector('h2').textContent, 'Robin');
   await act(() => show.click());
-  await act(() => t.mock.timers.tick(visualizations[0].durationMs));
+  await act(() => t.mock.timers.tick(3600000));
+  assert.equal(document.querySelector('h2').textContent, 'Common Raven');
+  await act(() => document.querySelector('#back-to-live').click());
   assert.equal(document.querySelector('h2').textContent, 'Listening for owls');
-  assert.equal(document.querySelector('#back-to-live'), null);
 });
 
 test('history errors can be retried without interrupting the event stream', async (t) => {
@@ -142,7 +151,7 @@ test('a late history response keeps species received from the live stream', asyn
 
 test('passes the preceding bird to a visualization, ignoring duplicate events and tracking birds during previews', async t => {
   const received = [];
-  visualizations.push({ id: 'pair-test', name: 'Pair test', createdBy: 'Test', durationMs: 60000, Component: props => { received.push(props); return <h2>{props.bird.commonName}</h2>; } });
+  visualizations.push({ id: 'pair-test', name: 'Pair test', createdBy: 'Test', Component: props => { received.push(props); return <h2>{props.bird.commonName}</h2>; } });
   t.after(() => visualizations.pop());
   const { source, change } = await mountBoard(t);
   await act(() => document.querySelector('#randomize').click());
@@ -158,8 +167,7 @@ test('passes the preceding bird to a visualization, ignoring duplicate events an
   assert.deepEqual(received.at(-1).previousBird, crow);
   const owl = { id: 44, commonName: 'Barn Owl', scientificName: 'Tyto alba', confidence: .99 };
   await act(() => source.emit('detection', owl));
-  assert.deepEqual(received.at(-1).bird, robin);
-  await act(() => document.querySelector('#back-to-live').click());
+  assert.deepEqual(received.at(-1).bird, owl);
   const next = { ...crow, id: 45 };
   await act(() => source.emit('detection', next));
   assert.deepEqual(received.at(-1).bird, next);
@@ -169,7 +177,7 @@ test('passes the preceding bird to a visualization, ignoring duplicate events an
 
 test('recent sidebar clicks use the selected visualization and live detections appear during manual playback', async t => {
   const selected = [];
-  visualizations.push({ id: 'sidebar-test', name: 'Sidebar test', createdBy: 'Test', durationMs: 60000, Component: ({ bird }) => { selected.push(bird); return <h2>{bird.commonName}</h2>; } });
+  visualizations.push({ id: 'sidebar-test', name: 'Sidebar test', createdBy: 'Test', Component: ({ bird }) => { selected.push(bird); return <h2>{bird.commonName}</h2>; } });
   t.after(() => visualizations.pop());
   const { source, change } = await mountBoard(t, undefined, [robin]);
   assert.equal(document.querySelector('section h2').textContent, 'Listening for owls');
@@ -181,7 +189,7 @@ test('recent sidebar clicks use the selected visualization and live detections a
   const crow = { id: 43, commonName: 'American Crow', scientificName: 'Corvus brachyrhynchos', confidence: .95, timestamp: '2026-11-23T00:00:00Z' };
   await act(() => source.emit('detection', crow));
   assert.deepEqual([...document.querySelectorAll('.recent-name')].map(el => el.textContent), ['American Crow', 'Robin']);
-  assert.deepEqual(selected.at(-1), robin);
+  assert.deepEqual(selected.at(-1), crow);
   await act(() => document.querySelector('aside li button').click());
   assert.deepEqual(selected.at(-1), crow);
 });

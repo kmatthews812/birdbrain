@@ -3,14 +3,13 @@
 import React, { useEffect, useState } from 'react';
 import { createTools } from '../lib/visualization-tools.mjs';
 
-export default function Player({ visualization, bird, previousBird, onDone, sound }) {
+export default function Player({ visualization, bird, previousBird, sound }) {
   const [session, setSession] = useState(null);
   useEffect(() => {
     const controller = new AbortController();
     setSession({ cancel: () => controller.abort(), signal: controller.signal, tools: createTools({ signal: controller.signal, sound }) });
-    const timer = setTimeout(onDone, visualization.durationMs);
-    return () => { clearTimeout(timer); controller.abort(); };
-  }, [visualization, onDone, sound]);
+    return () => controller.abort();
+  }, [visualization, sound]);
   const Component = visualization.Component;
   return <>
     {session && <VisualizationBoundary bird={bird} onError={session.cancel}><Component bird={bird} previousBird={previousBird} tools={session.tools} signal={session.signal} /></VisualizationBoundary>}

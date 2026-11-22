@@ -30,7 +30,6 @@ export default function Board({ version }) {
   const [historyStatus, setHistoryStatus] = useState('loading');
   const [historyAttempt, setHistoryAttempt] = useState(0);
   const [preview, setPreview] = useState(false);
-  const previewing = useRef(false);
   const previous = useRef(null);
   const lastBird = useRef(null);
   const [previousBird, setPreviousBird] = useState(null);
@@ -54,7 +53,6 @@ export default function Board({ version }) {
   const options = useRef();
   options.current = { randomize, selectedId };
   const play = useCallback((detection, manual = false) => {
-    previewing.current = manual;
     setPreview(manual);
     const next = options.current.randomize
       ? selectVisualization(visualizations, previous.current)
@@ -67,7 +65,6 @@ export default function Board({ version }) {
     setSequence(value => value + 1);
   }, []);
   const finish = useCallback(() => {
-    previewing.current = false;
     setPreview(false);
     setBird(null);
   }, []);
@@ -86,8 +83,7 @@ export default function Board({ version }) {
       }
       setSeenBirds(current => mergeBirds(current, [detection]));
       setLatestDetection(detection);
-      if (!previewing.current) play(detection);
-      else lastBird.current = detection;
+      play(detection);
     });
 
     const controller = new AbortController();
@@ -145,7 +141,7 @@ export default function Board({ version }) {
       </div>
       <div className="display-layout">
         <section aria-live="polite">
-          {bird && visualization ? <Player key={sequence} visualization={visualization} bird={bird} previousBird={previousBird} onDone={finish} sound={sound} /> : <>
+          {bird && visualization ? <Player key={sequence} visualization={visualization} bird={bird} previousBird={previousBird} sound={sound} /> : <>
             <div className="rings" aria-hidden="true" />
             <div className="caption"><h2>Listening for owls</h2></div>
           </>}

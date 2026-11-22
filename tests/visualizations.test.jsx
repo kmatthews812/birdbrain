@@ -15,14 +15,13 @@ test('selects across the registry without immediately repeating a visualization'
   assert.equal(selectVisualization([], null), null);
 });
 
-test('registered visualizations declare unique IDs, credits, components, and bounded durations', () => {
+test('registered visualizations declare unique IDs, credits, components', () => {
   assert.equal(new Set(visualizations.map(v => v.id)).size, visualizations.length);
   for (const v of visualizations) {
     assert.match(v.id, /^[a-z0-9-]+$/);
     assert.match(v.name, /\S/);
     assert.match(v.createdBy, /\S/);
     assert.equal(typeof v.Component, 'function');
-    assert.equal(v.durationMs > 0 && v.durationMs <= 300000, true);
   }
   assert.deepEqual(visualizations.map(({ id, name, createdBy }) => ({ id, name, createdBy })), [{ id: 'default-view', name: 'Default View', createdBy: 'Kevin' }, { id: 'celebrity-death-match', name: 'Celebrity Death Match', createdBy: 'Kevin' }]);
 });
@@ -36,9 +35,9 @@ test('player passes bird and tools, credits the author, and cleans up when repla
   const bird = { id: 42, commonName: 'Robin', confidence: 0.9 };
   let received;
   function Example(props) { received = props; return <h2>{props.bird.commonName}</h2>; }
-  const visualization = { id: 'test', name: 'Bird party', createdBy: 'Sam', durationMs: 10000, Component: Example };
+  const visualization = { id: 'test', name: 'Bird party', createdBy: 'Sam', Component: Example };
   try {
-    await act(() => root.render(<Player visualization={visualization} bird={bird} onDone={() => {}} />));
+    await act(() => root.render(<Player visualization={visualization} bird={bird} />));
     assert.equal(document.querySelector('h2').textContent, 'Robin');
     assert.equal(document.querySelector('.credit').textContent, 'Bird party · Created by Sam');
     assert.deepEqual(received.bird, bird);
@@ -58,13 +57,13 @@ test('a broken visualization shows the bird fallback, cancels tools, and the nex
   const root = createRoot(document.getElementById('root'));
   let signal;
   const bird = { commonName: 'Robin', confidence: 0.9 };
-  const broken = { id: 'broken', name: 'Oops', createdBy: 'Sam', durationMs: 10000, Component(props) { signal = props.signal; throw new Error('broken'); } };
+  const broken = { id: 'broken', name: 'Oops', createdBy: 'Sam', Component(props) { signal = props.signal; throw new Error('broken'); } };
   try {
-    await act(() => root.render(<Player key="first" visualization={broken} bird={bird} onDone={() => {}} />));
+    await act(() => root.render(<Player key="first" visualization={broken} bird={bird} />));
     assert.equal(document.querySelector('h2').textContent, 'Robin');
     assert.equal(document.querySelector('[role="status"]').textContent, 'This visualization needs a little help. Listening for the next bird.');
     assert.equal(signal.aborted, true);
-    await act(() => root.render(<Player key="next" visualization={visualizations[0]} bird={bird} onDone={() => {}} />));
+    await act(() => root.render(<Player key="next" visualization={visualizations[0]} bird={bird} />));
     assert.equal(document.querySelector('h2').textContent, 'Robin');
     assert.equal(document.querySelector('[role="status"]'), null);
   } finally { await act(() => root.unmount()); dom.window.close(); }
