@@ -13,24 +13,22 @@ with OpenAI using the current and preceding birds. It waits for an opponent on
 the first detection. To stage a manual matchup, preview one bird, select Celebrity
 Death Match with Randomize unchecked, then preview the second bird. Live events
 received during previews still update the preceding bird for the next matchup.
-The matchup lasts up to three minutes including generation; new live detections
-can replace it. Each matchup generates a new GIF and incurs an image API charge.
+The matchup remains visible until another detection or manual selection replaces it. Each matchup generates a new GIF and incurs an image API charge.
 
 The upper-right selector chooses a specific visualization when **Randomize** is
 unchecked. Randomize is checked by default. Choose a previously seen species and
-press **Show bird** to preview it. Manual previews are not interrupted by live
-detections; **Back to live** or the visualization timeout resumes live playback.
+press **Show bird** to preview it. Manual previews remain visible until the next live
+detection or another manual selection. **Back to live** clears a manual preview.
 
 Create a component under `visualizations/`, import it in `visualizations/index.jsx`,
 and add an entry to `visualizations`:
 
 ```jsx
 { id: 'bird-party', name: 'Bird Party', createdBy: 'Your name',
-  durationMs: 20000, Component: BirdParty }
+  Component: BirdParty }
 ```
 
-IDs must be unique lowercase kebab-case, names and credits nonempty, and durations
-between 1 and 300000 milliseconds. The registry test checks these rules.
+IDs must be unique lowercase kebab-case and names and credits nonempty. The registry test checks these rules.
 The component can render any React markup, SVG, canvas, images, or CSS animation
 inside the main stage. Scope your CSS to your component so other creations keep
 their styles. Honor `prefers-reduced-motion` where possible.
@@ -97,11 +95,13 @@ The same audio context is reused after that tap; muting stops active sounds.
 ## Lifetimes and errors
 
 In live mode, each new detection immediately replaces the previous visualization. Repeated IDs
-within the last 100 detections are ignored. After `durationMs`, the stage returns
-to “Listening for owls.” Events received while the page is disconnected or asleep
+within the last 100 detections are ignored. Visualizations have no automatic expiry.
+Before the first playback, the stage shows “Listening…” and the elapsed time since
+the latest real sighting, updated every second. Historical previews do not change
+that timestamp. Events received while the page is disconnected or asleep
 are not replayed; this is a live display, not a durable event log.
 
-Replacement, timeout, and render errors abort tool requests and stop sounds. Your
+Replacement, clearing the preview, and render errors abort tool requests and stop sounds. Your
 component must still clean up its own timers, animation frames, listeners, and
 other resources in effect cleanup functions. Catch async errors inside the
 component; React error boundaries handle render/lifecycle failures, not arbitrary
@@ -116,8 +116,8 @@ useEffect(() => {
 ```
 
 BirdNET tool requests time out after 15 seconds; OpenAI requests after 120 seconds,
-or sooner when the visualization ends. For expensive generation, select a suitable
-duration and show a useful placeholder immediately. New detections can still
+or sooner when the visualization is replaced. For expensive generation,
+show a useful placeholder immediately. New detections can still
 interrupt it. Aborting a request does not guarantee cancellation of provider charges.
 Never execute generated code or inject untrusted HTML into the page. Components
 added to this repository are trusted application code, not sandboxed plugins.
