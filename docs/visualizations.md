@@ -82,9 +82,10 @@ search citations as visible links. Do not assume the first output item is a mess
 The API supports [web search](https://developers.openai.com/api/docs/guides/tools-web-search)
 and [animated GIF output](https://developers.openai.com/api/docs/guides/image-generation#generate-animated-gif-output).
 Model access depends on the configured OpenAI account. Calls incur API charges;
-Default View uses web search for its fun fact and caches successful facts per
-species for 24 hours in server memory (up to 256 species). Concurrent lookups share
-one request. Photos are cached for a day. There is no spending quota; other
+Default View makes a fresh web-search request for each playback, including repeat
+sightings of the same species. Facts and generated GIFs are not cached or shared
+between playbacks. OpenAI may still return a similar fact on a new request. Photos
+are cached for a day. There is no spending quota; other
 visualizations should cache expensive repeated generation.
 
 Put sound assets in `public/sounds/`. Tap **Enable sound** once after opening or
