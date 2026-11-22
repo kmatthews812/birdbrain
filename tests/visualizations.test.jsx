@@ -48,3 +48,24 @@ test('player passes bird and tools, credits the author, and cleans up when repla
     assert.equal(received.signal.aborted, true);
   } finally { dom.window.close(); }
 });
+
+test('a broken visualization shows the bird fallback, cancels tools, and the next one can play', async (t) => {
+  const dom = new JSDOM('<div id="root"></div>');
+  globalThis.window = dom.window;
+  globalThis.document = dom.window.document;
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  t.mock.method(console, 'error', () => {});
+  const root = createRoot(document.getElementById('root'));
+  let signal;
+  const bird = { commonName: 'Robin', confidence: 0.9 };
+  const broken = { id: 'broken', name: 'Oops', createdBy: 'Sam', durationMs: 10000, Component(props) { signal = props.signal; throw new Error('broken'); } };
+  try {
+    await act(() => root.render(<Player key="first" visualization={broken} bird={bird} onDone={() => {}} />));
+    assert.equal(document.querySelector('h2').textContent, 'Robin');
+    assert.equal(document.querySelector('[role="status"]').textContent, 'This visualization needs a little help. Listening for the next bird.');
+    assert.equal(signal.aborted, true);
+    await act(() => root.render(<Player key="next" visualization={visualizations[0]} bird={bird} onDone={() => {}} />));
+    assert.equal(document.querySelector('h2').textContent, 'Robin');
+    assert.equal(document.querySelector('[role="status"]'), null);
+  } finally { await act(() => root.unmount()); dom.window.close(); }
+});
