@@ -99,3 +99,31 @@ test('preserves missing-image status so the UI can show an honest fallback', asy
   assert.equal(response.status, 404);
   assert.deepEqual(await response.json(), { error: 'No image is available for this bird.' });
 });
+
+test('returns image attribution from BirdNET with safe source and license links', async () => {
+  const credit = { authorName: 'Adam Jackson', authorURL: 'https://example.test/author', licenseName: 'CC0 1.0 Universal', licenseURL: 'https://creativecommons.org/publicdomain/zero/1.0/', sourceProvider: 'avicommons' };
+  const response = await getBirdImage(new Request('http://birdbrain.test/api/birds/image?species=Corvus%20brachyrhynchos&info=1'), {
+    env: { BIRDNET_BASE_URL: 'http://birdnet.test:8080', BIRDNET_TOKEN: 'private-token' },
+    fetch: async (url, options) => {
+      assert.equal(String(url), 'http://birdnet.test:8080/api/v2/media/species-image/info?name=Corvus+brachyrhynchos');
+      assert.deepEqual(options.headers, { Accept: 'application/json', Authorization: 'Bearer private-token' });
+      assert.equal(options.redirect, 'error');
+      return Response.json({ ...credit, internal: 'never forward' });
+    },
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), credit);
+});
+
+test('strips unsafe attribution links and normalizes missing attribution fields', async () => {
+  const response = await getBirdImage(new Request('http://birdbrain.test/api/birds/image?species=Corvus%20corax&info=1'), { env: {}, fetch: async () => Response.json({ authorName: 'Photographer', authorURL: 'javascript:alert(1)', licenseURL: 'data:text/html,secret' }) });
+  assert.deepEqual(await response.json(), { authorName: 'Photographer', authorURL: '', licenseName: '', licenseURL: '', sourceProvider: '' });
+});
+
+test('rejects malformed attribution responses', async () => {
+  for (const payload of [null, [], { authorName: {} }]) {
+    const response = await getBirdImage(new Request('http://birdbrain.test/api/birds/image?species=Corvus%20corax&info=1'), { env: {}, fetch: async () => Response.json(payload) });
+    assert.equal(response.status, 502);
+    assert.deepEqual(await response.json(), { error: 'Bird image could not be loaded.' });
+  }
+});
