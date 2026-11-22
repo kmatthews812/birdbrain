@@ -398,7 +398,7 @@ test('highlights the playing sighting while newer queued sightings stack above i
   assert.equal(document.querySelector('.next-bird').textContent, '30 seconds remaining');
 });
 
-test('waits for preparation, shows sidebar processing, and gives each ready selection thirty seconds', async t => {
+test('shows the first live bird loading and gives completed live views thirty seconds', async t => {
   const ready = new Map();
   visualizations.push({ id: 'controlled', name: 'Controlled', createdBy: 'Test', Component: ({ bird, onReady }) => {
     ready.set(bird.id, onReady);
@@ -409,7 +409,8 @@ test('waits for preparation, shows sidebar processing, and gives each ready sele
   await act(() => document.querySelector('#randomize').click());
   await change(document.querySelector('#visualization'), 'controlled');
   await act(() => source.emit('detection', robin));
-  assert.equal(document.querySelector('section h2').textContent, 'Listening…');
+  assert.equal(document.querySelector('[data-playback]:not([hidden]) h2').textContent, 'Robin');
+  assert.equal(document.querySelector('.next-bird'), null);
   assert.equal(document.querySelectorAll('aside [role="status"]').length, 1);
   await act(() => t.mock.timers.tick(45000));
   await act(() => ready.get(42)());
@@ -423,11 +424,4 @@ test('waits for preparation, shows sidebar processing, and gives each ready sele
   await act(() => ready.get(43)());
   assert.equal(document.querySelector('[data-playback]:not([hidden]) h2').textContent, 'Crow');
   assert.equal(document.querySelectorAll('aside [role="status"]').length, 0);
-  await act(() => document.querySelector('aside li button').click());
-  await act(() => ready.get(42)());
-  await act(() => t.mock.timers.tick(29999));
-  assert.equal(document.querySelector('[data-playback]:not([hidden]) h2').textContent, 'Crow');
-  await act(() => t.mock.timers.tick(1));
-  assert.equal(document.querySelector('[data-playback]:not([hidden]) h2').textContent, 'Robin');
-  assert.equal(document.querySelector('.next-bird').textContent, '30 seconds remaining');
 });

@@ -39,7 +39,8 @@ export default function Board({ version }) {
     updateLastSighting(latest?.timestamp);
   }, [updateLastSighting]);
   const [bird, setBird] = useState(null);
-  const [startedAt, setStartedAt] = useState(0);
+  const [startedAt, setStartedAt] = useState(null);
+  const displayed = useRef(null);
   const nextSequence = useRef(0);
   const [activeId, setActiveId] = useState(null);
   const [entries, setEntries] = useState([]);
@@ -71,6 +72,7 @@ export default function Board({ version }) {
   const options = useRef();
   options.current = { randomize, selectedId };
   const play = useCallback(item => {
+    displayed.current = item;
     setStartedAt(Date.now());
     setPreview(item.manual);
     setBird(item.detection);
@@ -94,6 +96,12 @@ export default function Board({ version }) {
     previous.current = visualization?.id;
     lastBird.current = detection;
     setEntries(current => [...current, item]);
+    if (!displayed.current) {
+      displayed.current = item;
+      setBird(item.detection);
+      setActiveId(item.id);
+      setStartedAt(null);
+    }
     queue.enqueue(item, { ready: false });
   }, [queue]);
   useEffect(() => () => queue.clear(), [queue]);
@@ -104,6 +112,7 @@ export default function Board({ version }) {
     previous.current = null;
     setPreview(false);
     setBird(null);
+    displayed.current = null;
   }, [queue]);
 
   useEffect(() => {
@@ -114,6 +123,7 @@ export default function Board({ version }) {
       previous.current = null;
       setWatching(false);
       setBird(null);
+      displayed.current = null;
       setPreview(false);
       alertRequest.current?.abort();
     };
@@ -223,7 +233,7 @@ export default function Board({ version }) {
               <ListeningStatus timestamp={lastSighting} loading={recentStatus === 'loading'} error={recentStatus === 'error'} />
             </>}
             {entries.map(item => <div key={item.id} data-playback={item.id} hidden={item.id !== activeId}><Player visualization={item.visualization} bird={item.detection} previousBird={item.previousBird} sound={sound} active={item.id === activeId} onReady={item.onReady} /></div>)}
-            {bird && <NextBird startedAt={startedAt} pending={pendingCount > 0} />}
+            {bird && startedAt !== null && <NextBird startedAt={startedAt} pending={pendingCount > 0} />}
           </>}
         </section>
         {watching && <RecentHistory processingBirds={entries.filter(item => !item.ready).map(item => item.detection)} activeBird={bird} onHistory={onHistory} detection={latestDetection} onSelect={detection => enqueue(detection, true)} />}
