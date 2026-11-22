@@ -10,7 +10,7 @@ import { visualizations } from '../visualizations/index.jsx';
 const robin = { id: 42, commonName: 'Robin', scientificName: 'Turdus migratorius', confidence: 0.9 };
 async function mountBoard(t, fetcher = async (url) => Response.json(url === '/api/birds/history' ? { birds: [] } : { version: 'test' }), recent = []) {
   t.mock.method(Math, 'random', () => 0);
-  const dom = new JSDOM('<div id="root"></div>');
+  const dom = new JSDOM('<div id="root"></div>', { pretendToBeVisual: true });
   globalThis.window = dom.window;
   globalThis.document = dom.window.document;
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -42,7 +42,7 @@ async function mountBoard(t, fetcher = async (url) => Response.json(url === '/ap
   const root = createRoot(document.getElementById('root'));
   t.after(async () => { await act(() => root.unmount()); assert.equal(source.closed, true); dom.window.close(); });
   await act(() => root.render(<Board version="test" />));
-  return { source, requests, audio, resumed: () => resumed, change: async (element, value) => {
+  return { source, getSource: () => source, requests, audio, resumed: () => resumed, change: async (element, value) => {
     await act(() => { element.value = value; element.dispatchEvent(new dom.window.Event('change', { bubbles: true })); });
   } };
 }
@@ -274,4 +274,39 @@ test('alerts once for each new detection, including repeat species, and header m
   await act(() => source.emit('detection', { ...robin, id: 46 }));
   assert.equal(audio.at(-1), 'play');
   assert.equal(audio.filter(event => event === 'play').length, 3);
+});
+
+
+test('page departure cancels generation and stops detections until a viewer returns', async t => {
+  const { source, getSource, requests } = await mountBoard(t);
+  await act(() => source.emit('detection', robin));
+  const fact = requests.find(call => call.url === '/api/birds/fact');
+  const photo = requests.find(call => call.url.startsWith('/api/birds/photo?'));
+  assert.equal(fact.options.signal.aborted, false);
+  await act(() => window.dispatchEvent(new window.Event('pagehide')));
+  assert.equal(source.closed, true);
+  assert.equal(fact.options.signal.aborted, true);
+  assert.equal(photo.options.signal.aborted, true);
+  assert.equal(document.querySelector('section h2').textContent, 'Paused');
+  const before = requests.length;
+  await act(() => { source.emit('detection', { ...robin, id: 43 }); t.mock.timers.tick(60000); });
+  assert.equal(requests.length, before);
+  await act(() => window.dispatchEvent(new window.Event('pageshow')));
+  assert.notEqual(getSource(), source);
+  assert.equal(document.querySelector('section h2').textContent, 'Listening…');
+  assert.equal(requests.filter(call => call.url === '/api/birds/fact').length, 1);
+});
+
+test('hidden tabs pause external work and resume listening without replaying missed birds', async t => {
+  const { source, requests } = await mountBoard(t);
+  Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+  await act(() => document.dispatchEvent(new window.Event('visibilitychange')));
+  assert.equal(source.closed, true);
+  const before = requests.length;
+  await act(() => source.emit('detection', robin));
+  assert.equal(requests.length, before);
+  Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+  await act(() => document.dispatchEvent(new window.Event('visibilitychange')));
+  assert.equal(document.querySelector('section h2').textContent, 'Listening…');
+  assert.equal(requests.filter(call => call.url === '/api/birds/fact').length, 0);
 });

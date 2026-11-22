@@ -8,7 +8,9 @@ export default function Player({ visualization, bird, previousBird, sound }) {
   useEffect(() => {
     const controller = new AbortController();
     setSession({ cancel: () => controller.abort(), signal: controller.signal, tools: createTools({ signal: controller.signal, sound }) });
-    return () => controller.abort();
+    const cancel = () => controller.abort();
+    window.addEventListener('pagehide', cancel);
+    return () => { window.removeEventListener('pagehide', cancel); cancel(); };
   }, [visualization, sound]);
   const Component = visualization.Component;
   return <>
