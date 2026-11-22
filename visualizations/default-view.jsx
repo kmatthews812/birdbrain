@@ -1,11 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
-export default function DefaultView({ bird, signal }) {
+export default function DefaultView({ bird, signal, onReady }) {
   const [fact, setFact] = useState(null);
   const [factFailed, setFactFailed] = useState(false);
   const [credit, setCredit] = useState(null);
   const [photoFailed, setPhotoFailed] = useState(false);
   const [photo, setPhoto] = useState(null);
+  const [photoLoaded, setPhotoLoaded] = useState(false);
+  const notified = useRef(false);
+  useEffect(() => {
+    if (signal?.aborted || notified.current || !(fact || factFailed) || !(photoLoaded || photoFailed)) return;
+    notified.current = true;
+    onReady?.();
+  }, [fact, factFailed, photoLoaded, photoFailed, onReady, signal]);
   useEffect(() => {
     const controller = new AbortController();
     const requestSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
@@ -34,7 +41,7 @@ export default function DefaultView({ bird, signal }) {
   }, [bird.commonName, bird.scientificName, signal]);
   return <article className="default-view">
     <figure>
-      {photoFailed || !photo ? <div className="photo-placeholder">{photoFailed ? 'No photo available yet' : 'Finding a bird photo…'}</div> : <img className="bird-photo" src={photo} alt={bird.commonName} onError={() => setPhotoFailed(true)} />}
+      {photoFailed || !photo ? <div className="photo-placeholder">{photoFailed ? 'No photo available yet' : 'Finding a bird photo…'}</div> : <img className="bird-photo" src={photo} alt={bird.commonName} onLoad={() => { if (!signal?.aborted) setPhotoLoaded(true); }} onError={() => { if (!signal?.aborted) setPhotoFailed(true); }} />}
       {credit && <figcaption>
         {credit.authorName && <>Photo: {credit.authorURL ? <a href={credit.authorURL} target="_blank" rel="noreferrer">{credit.authorName}</a> : credit.authorName}</>}
         {credit.licenseName && <> · {credit.licenseURL ? <a href={credit.licenseURL} target="_blank" rel="noreferrer">{credit.licenseName}</a> : credit.licenseName}</>}

@@ -6,7 +6,7 @@ import { JSDOM } from 'jsdom';
 import BirdDance from '../visualizations/bird-dance.jsx';
 
 const bird = { commonName: 'American Crow', scientificName: 'Corvus brachyrhynchos' };
-async function mount(t, image, strict = false) {
+async function mount(t, image, strict = false, onReady) {
   const dom = new JSDOM('<div id="root"></div>');
   globalThis.window = dom.window;
   globalThis.document = dom.window.document;
@@ -14,7 +14,7 @@ async function mount(t, image, strict = false) {
   const root = createRoot(document.getElementById('root'));
   const controller = new AbortController();
   t.after(async () => { controller.abort(); await act(() => root.unmount()); dom.window.close(); });
-  const view = <BirdDance bird={bird} tools={{ image }} signal={controller.signal} />;
+  const view = <BirdDance bird={bird} tools={{ image }} signal={controller.signal} onReady={onReady} />;
   await act(() => root.render(strict ? <React.StrictMode>{view}</React.StrictMode> : view));
   controller.regenerate = () => act(() => root.render(React.cloneElement(view, { key: 'regenerated' })));
   return controller;
@@ -77,4 +77,33 @@ test('regenerating the same bird uses different creative scene and choreography 
     assert.match(prompt, /Scene variation:/);
     assert.match(prompt, /American Crow/);
   }
+});
+
+test('reports readiness only after the generated GIF loads and ignores loads after cancellation', async t => {
+  let ready = 0;
+  const controller = await mount(t, async () => ({ data: [{ b64_json: 'R0lGODlh' }] }), false, () => ready++);
+  assert.equal(ready, 0);
+  await act(() => document.querySelector('img').dispatchEvent(new window.Event('load')));
+  assert.equal(ready, 1);
+  await act(() => document.querySelector('img').dispatchEvent(new window.Event('load')));
+  assert.equal(ready, 1);
+  await controller.regenerate();
+  controller.abort();
+  await act(() => document.querySelector('img').dispatchEvent(new window.Event('load')));
+  assert.equal(ready, 1);
+});
+
+test('a failed GIF load becomes a ready fallback', async t => {
+  let ready = 0;
+  await mount(t, async () => ({ data: [{ b64_json: 'bad' }] }), false, () => ready++);
+  await act(() => document.querySelector('img').dispatchEvent(new window.Event('error')));
+  assert.equal(ready, 1);
+  assert.equal(document.querySelector('img'), null);
+  assert.equal(document.querySelector('.dance-placeholder').textContent, 'The dance could not be generated. This bird will try again next time!');
+});
+
+test('generation failure reports a ready fallback', async t => {
+  let ready = 0;
+  await mount(t, async () => { throw new Error('failed'); }, false, () => ready++);
+  assert.equal(ready, 1);
 });

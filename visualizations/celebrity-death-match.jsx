@@ -1,9 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { nextGifVariation } from '../lib/gif-variation.mjs';
 
-export default function CelebrityDeathMatch({ bird, previousBird, tools, signal }) {
+export default function CelebrityDeathMatch({ bird, previousBird, tools, signal, onReady }) {
   const [image, setImage] = useState(null);
   const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const notified = useRef(false);
+  useEffect(() => {
+    if (signal.aborted || notified.current || !(!previousBird || loaded || failed)) return;
+    notified.current = true;
+    onReady?.();
+  }, [previousBird, loaded, failed, onReady, signal]);
   useEffect(() => {
     let active = true;
     setImage(null);
@@ -25,7 +32,7 @@ export default function CelebrityDeathMatch({ bird, previousBird, tools, signal 
   return <article className="death-match">
     <p className="eyebrow">Celebrity Death Match</p>
     <h2>{title}</h2>
-    {image ? <img className="match-gif" src={image} alt={`${bird.commonName} and ${previousBird.commonName} in a playful claymation wrestling match`} /> : <div className="match-arena">
+    {image ? <img className="match-gif" src={image} onLoad={() => { if (!signal.aborted) setLoaded(true); }} onError={() => { if (!signal.aborted) { setImage(null); setFailed(true); } }} alt={`${bird.commonName} and ${previousBird.commonName} in a playful claymation wrestling match`} /> : <div className="match-arena">
       <p className="match-status">{!previousBird ? 'Waiting for another bird to make a match.' : failed ? 'The match could not be generated. The birds will be back!' : 'Building the clay arena…'}</p>
     </div>}
   </article>;

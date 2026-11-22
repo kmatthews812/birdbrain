@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 import DefaultView from '../visualizations/default-view.jsx';
 
-async function mount(t, fetcher, strict = false) {
+async function mount(t, fetcher, strict = false, onReady) {
   const dom = new JSDOM('<div id="root"></div>');
   globalThis.window = dom.window;
   globalThis.document = dom.window.document;
@@ -14,7 +14,7 @@ async function mount(t, fetcher, strict = false) {
   const root = createRoot(document.getElementById('root'));
   const controller = new AbortController();
   t.after(async () => { controller.abort(); await act(() => root.unmount()); dom.window.close(); });
-  const view = <DefaultView bird={{ commonName: 'American Crow', scientificName: 'Corvus brachyrhynchos' }} signal={controller.signal} />;
+  const view = <DefaultView bird={{ commonName: 'American Crow', scientificName: 'Corvus brachyrhynchos' }} signal={controller.signal} onReady={onReady} />;
   await act(() => root.render(strict ? <React.StrictMode>{view}</React.StrictMode> : view));
   return controller;
 }
@@ -63,4 +63,41 @@ test('requests one fresh fact and photo during development StrictMode replay', a
   assert.equal(facts, 1);
   assert.equal(photos, 1);
   assert.equal(document.querySelector('.fun-fact').textContent, 'Fresh fact');
+});
+
+test('waits for both a loaded photo and a settled fact before reporting ready', async t => {
+  let ready = 0, releaseFact;
+  await mount(t, url => url.startsWith('/api/birds/photo?')
+    ? Promise.resolve(Response.json({ url: '/photo.jpg' }))
+    : new Promise(resolve => { releaseFact = resolve; }), false, () => ready++);
+  assert.equal(ready, 0);
+  await act(() => document.querySelector('img').dispatchEvent(new window.Event('load')));
+  assert.equal(ready, 0);
+  await act(() => releaseFact(Response.json({ fact: 'Fresh fact', sources: [] })));
+  assert.equal(ready, 1);
+  await act(() => document.querySelector('img').dispatchEvent(new window.Event('load')));
+  assert.equal(ready, 1);
+});
+
+test('unavailable fact and photo produce a ready fallback', async t => {
+  let ready = 0;
+  await mount(t, async () => Response.json({}, { status: 502 }), false, () => ready++);
+  assert.equal(ready, 1);
+});
+
+test('a photo load error settles preparation after a successful fact', async t => {
+  let ready = 0;
+  await mount(t, async url => Response.json(url.startsWith('/api/birds/photo?') ? { url: '/bad.jpg' } : { fact: 'Fresh fact', sources: [] }), false, () => ready++);
+  assert.equal(ready, 0);
+  await act(() => document.querySelector('img').dispatchEvent(new window.Event('error')));
+  assert.equal(ready, 1);
+  assert.equal(document.querySelector('img'), null);
+});
+
+test('cancelled preparation does not report readiness when the image later loads', async t => {
+  let ready = 0;
+  const controller = await mount(t, async url => Response.json(url.startsWith('/api/birds/photo?') ? { url: '/photo.jpg' } : { fact: 'Fresh fact', sources: [] }), false, () => ready++);
+  controller.abort();
+  await act(() => document.querySelector('img').dispatchEvent(new window.Event('load')));
+  assert.equal(ready, 0);
 });

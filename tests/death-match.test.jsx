@@ -7,7 +7,7 @@ import CelebrityDeathMatch from '../visualizations/celebrity-death-match.jsx';
 
 const bird = { commonName: 'American Crow', scientificName: 'Corvus brachyrhynchos' };
 const previousBird = { commonName: 'Barn Owl', scientificName: 'Tyto alba' };
-async function mount(t, image, opponent = previousBird, strict = false) {
+async function mount(t, image, opponent = previousBird, strict = false, onReady) {
   const dom = new JSDOM('<div id="root"></div>');
   globalThis.window = dom.window;
   globalThis.document = dom.window.document;
@@ -15,7 +15,7 @@ async function mount(t, image, opponent = previousBird, strict = false) {
   const root = createRoot(document.getElementById('root'));
   const controller = new AbortController();
   t.after(async () => { controller.abort(); await act(() => root.unmount()); dom.window.close(); });
-  const view = <CelebrityDeathMatch bird={bird} previousBird={opponent} tools={{ image }} signal={controller.signal} />;
+  const view = <CelebrityDeathMatch bird={bird} previousBird={opponent} tools={{ image }} signal={controller.signal} onReady={onReady} />;
   await act(() => root.render(strict ? <React.StrictMode>{view}</React.StrictMode> : view));
   controller.regenerate = () => act(() => root.render(React.cloneElement(view, { key: 'regenerated' })));
   return controller;
@@ -90,4 +90,35 @@ test('regenerating the same bird uses different creative scene and choreography 
     assert.match(prompt, /Scene variation:/);
     assert.match(prompt, /American Crow/);
   }
+});
+
+test('reports readiness after the match image loads, not when generation completes', async t => {
+  let ready = 0;
+  await mount(t, async () => ({ data: [{ b64_json: 'R0lGODlh' }] }), previousBird, false, () => ready++);
+  assert.equal(ready, 0);
+  await act(() => document.querySelector('img').dispatchEvent(new window.Event('load')));
+  assert.equal(ready, 1);
+  await act(() => document.querySelector('img').dispatchEvent(new window.Event('load')));
+  assert.equal(ready, 1);
+});
+
+test('a missing opponent is a ready fallback view', async t => {
+  let ready = 0;
+  await mount(t, async () => { throw new Error('should not request'); }, null, false, () => ready++);
+  assert.equal(ready, 1);
+});
+
+test('a failed match image load reports a ready fallback without a broken image', async t => {
+  let ready = 0;
+  await mount(t, async () => ({ data: [{ b64_json: 'bad' }] }), previousBird, false, () => ready++);
+  await act(() => document.querySelector('img').dispatchEvent(new window.Event('error')));
+  assert.equal(ready, 1);
+  assert.equal(document.querySelector('img'), null);
+  assert.equal(document.querySelector('.match-status').textContent, 'The match could not be generated. The birds will be back!');
+});
+
+test('failed match generation reports a ready fallback', async t => {
+  let ready = 0;
+  await mount(t, async () => { throw new Error('failed'); }, previousBird, false, () => ready++);
+  assert.equal(ready, 1);
 });

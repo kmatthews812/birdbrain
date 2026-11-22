@@ -1,9 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { nextGifVariation } from '../lib/gif-variation.mjs';
 
-export default function BirdDance({ bird, tools, signal }) {
+export default function BirdDance({ bird, tools, signal, onReady }) {
   const [image, setImage] = useState(null);
   const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const notified = useRef(false);
+  useEffect(() => {
+    if (signal.aborted || notified.current || !(loaded || failed)) return;
+    notified.current = true;
+    onReady?.();
+  }, [loaded, failed, onReady, signal]);
   useEffect(() => {
     let active = true;
     setImage(null);
@@ -23,7 +30,7 @@ export default function BirdDance({ bird, tools, signal }) {
   return <article className="bird-dance">
     <p className="eyebrow">Bird Dance</p>
     <h2>{bird.commonName}</h2>
-    {image ? <img className="dance-gif" src={image} alt={`${bird.commonName} doing a cheerful dance`} /> : <div className="dance-placeholder">
+    {image ? <img className="dance-gif" src={image} onLoad={() => { if (!signal.aborted) setLoaded(true); }} onError={() => { if (!signal.aborted) { setImage(null); setFailed(true); } }} alt={`${bird.commonName} doing a cheerful dance`} /> : <div className="dance-placeholder">
       <p>{failed ? 'The dance could not be generated. This bird will try again next time!' : 'Teaching this bird some moves…'}</p>
     </div>}
   </article>;
