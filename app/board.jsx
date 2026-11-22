@@ -23,12 +23,35 @@ export default function Board({ version }) {
   const [bird, setBird] = useState(null);
   const [sequence, setSequence] = useState(0);
   const [visualization, setVisualization] = useState(null);
+  const [seenBirds, setSeenBirds] = useState([]);
+  const [pastBird, setPastBird] = useState('');
+  const [historyStatus, setHistoryStatus] = useState('loading');
+  const [historyAttempt, setHistoryAttempt] = useState(0);
+  const [preview, setPreview] = useState(false);
+  const previewing = useRef(false);
   const previous = useRef(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    setHistoryStatus('loading');
+    fetch('/api/birds/history', { signal: controller.signal, cache: 'no-store' })
+      .then(async response => {
+        if (!response.ok) throw new Error('History unavailable');
+        const data = await response.json();
+        if (!Array.isArray(data.birds)) throw new Error('Invalid history');
+        if (controller.signal.aborted) return;
+        setSeenBirds(current => mergeBirds(data.birds, current));
+        setHistoryStatus('ready');
+      })
+      .catch(() => { if (!controller.signal.aborted) setHistoryStatus('error'); });
+    return () => controller.abort();
+  }, [historyAttempt]);
   const [randomize, setRandomize] = useState(true);
   const [selectedId, setSelectedId] = useState(visualizations[0].id);
   const options = useRef();
   options.current = { randomize, selectedId };
-  const play = useCallback((detection) => {
+  const play = useCallback((detection, manual = false) => {
+    previewing.current = manual;
+    setPreview(manual);
     const next = options.current.randomize
       ? selectVisualization(visualizations, previous.current)
       : visualizations.find(item => item.id === options.current.selectedId);
@@ -37,7 +60,11 @@ export default function Board({ version }) {
     setBird(detection);
     setSequence(value => value + 1);
   }, []);
-  const finish = useCallback(() => setBird(null), []);
+  const finish = useCallback(() => {
+    previewing.current = false;
+    setPreview(false);
+    setBird(null);
+  }, []);
 
   useEffect(() => {
     const stream = new EventSource('/api/birds/stream');
@@ -51,7 +78,8 @@ export default function Board({ version }) {
         seen.add(detection.id);
         if (seen.size > 100) seen.delete(seen.values().next().value);
       }
-      play(detection);
+      setSeenBirds(current => mergeBirds(current, [detection]));
+      if (!previewing.current) play(detection);
     });
 
     const controller = new AbortController();
@@ -95,6 +123,18 @@ export default function Board({ version }) {
           <p className="connection"><i data-online={online} />{online ? 'Live' : 'Connecting'}</p>
         </div>
       </header>
+      <div className="preview-controls">
+        <label htmlFor="past-bird">Previously seen birds</label>
+        <select id="past-bird" value={pastBird} disabled={!seenBirds.length} onChange={event => setPastBird(event.target.value)}>
+          <option value="">Choose a bird…</option>
+          {seenBirds.map(item => <option key={birdKey(item)} value={birdKey(item)}>{item.commonName}</option>)}
+        </select>
+        <button id="show-bird" type="button" disabled={!pastBird} onClick={() => play(seenBirds.find(item => birdKey(item) === pastBird), true)}>Show bird</button>
+        {preview && <><span className="preview-status">Manual preview</span><button id="back-to-live" type="button" onClick={finish}>Back to live</button></>}
+        {historyStatus === 'loading' && <span className="history-status">Loading bird history…</span>}
+        {historyStatus === 'error' && <><span className="history-status">Could not load previously seen birds.</span><button id="retry-history" type="button" onClick={() => setHistoryAttempt(value => value + 1)}>Retry</button></>}
+        {historyStatus === 'ready' && !seenBirds.length && <span className="history-status">No birds recorded yet.</span>}
+      </div>
       <section aria-live="polite">
         {bird && visualization ? <Player key={sequence} visualization={visualization} bird={bird} onDone={finish} sound={sound} /> : <>
           <div className="rings" aria-hidden="true" />
@@ -107,4 +147,11 @@ export default function Board({ version }) {
       </footer>
     </main>
   );
+}
+
+function birdKey(bird) { return bird.scientificName || bird.commonName; }
+function mergeBirds(existing, incoming) {
+  const birds = new Map(existing.map(bird => [birdKey(bird), bird]));
+  for (const bird of incoming) birds.set(birdKey(bird), { ...birds.get(birdKey(bird)), ...bird });
+  return [...birds.values()].sort((a, b) => a.commonName.localeCompare(b.commonName));
 }

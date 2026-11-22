@@ -8,7 +8,7 @@ import Board from '../app/board.jsx';
 import { visualizations } from '../visualizations/index.jsx';
 
 const robin = { id: 42, commonName: 'Robin', scientificName: 'Turdus migratorius', confidence: 0.9 };
-async function mountBoard(t, fetcher = async () => Response.json({ version: 'test' })) {
+async function mountBoard(t, fetcher = async (url) => Response.json(url === '/api/birds/history' ? { birds: [] } : { version: 'test' })) {
   const dom = new JSDOM('<div id="root"></div>');
   globalThis.window = dom.window;
   globalThis.document = dom.window.document;
@@ -82,4 +82,54 @@ test('unchecked Randomize uses the chosen visualization for every event; checkin
   assert.equal(select.disabled, true);
   await act(() => source.emit('detection', { ...robin, id: 44 }));
   assert.equal(document.querySelector('h2').textContent, 'Robin');
+});
+
+test('manually previews a historical bird with the selected view, then resumes live detections', async (t) => {
+  const historical = { commonName: 'Common Raven', scientificName: 'Corvus corax', count: 7 };
+  const { source, change } = await mountBoard(t, async (url) => Response.json(url === '/api/birds/history' ? { birds: [historical] } : { version: 'test' }));
+  assert.equal(document.querySelector('h2').textContent, 'Listening for owls');
+  const select = document.querySelector('#past-bird');
+  assert.deepEqual([...select.options].map(option => option.textContent), ['Choose a bird…', 'Common Raven']);
+  const show = document.querySelector('#show-bird');
+  assert.equal(show.disabled, true);
+  await act(() => document.querySelector('#randomize').click());
+  await change(select, 'Corvus corax');
+  assert.equal(show.disabled, false);
+  await act(() => show.click());
+  assert.equal(document.querySelector('h2').textContent, 'Common Raven');
+  assert.equal(document.querySelector('.preview-status').textContent, 'Manual preview');
+  await act(() => source.emit('detection', robin));
+  assert.equal(document.querySelector('h2').textContent, 'Common Raven');
+  assert.deepEqual([...select.options].map(option => option.textContent), ['Choose a bird…', 'Common Raven', 'Robin']);
+  await act(() => document.querySelector('#back-to-live').click());
+  assert.equal(document.querySelector('h2').textContent, 'Listening for owls');
+  await act(() => source.emit('detection', { ...robin, id: 43 }));
+  assert.equal(document.querySelector('h2').textContent, 'Robin');
+  await act(() => show.click());
+  await act(() => t.mock.timers.tick(visualizations[0].durationMs));
+  assert.equal(document.querySelector('h2').textContent, 'Listening for owls');
+  assert.equal(document.querySelector('#back-to-live'), null);
+});
+
+test('history errors can be retried without interrupting the event stream', async (t) => {
+  let calls = 0;
+  const { source } = await mountBoard(t, async () => {
+    calls++;
+    return calls === 1 ? Response.json({ error: 'offline' }, { status: 502 }) : Response.json({ birds: [] });
+  });
+  assert.equal(document.querySelector('.history-status').textContent, 'Could not load previously seen birds.');
+  assert.equal(document.querySelector('#past-bird').disabled, true);
+  await act(() => document.querySelector('#retry-history').click());
+  assert.equal(document.querySelector('.history-status').textContent, 'No birds recorded yet.');
+  await act(() => source.emit('detection', robin));
+  assert.equal(document.querySelector('#past-bird').disabled, false);
+  assert.equal(document.querySelector('h2').textContent, 'Robin');
+});
+
+test('a late history response keeps species received from the live stream', async (t) => {
+  let resolveHistory;
+  const { source } = await mountBoard(t, () => new Promise(resolve => { resolveHistory = resolve; }));
+  await act(() => source.emit('detection', robin));
+  await act(() => resolveHistory(Response.json({ birds: [{ commonName: 'Crow', scientificName: 'Corvus brachyrhynchos' }] })));
+  assert.deepEqual([...document.querySelector('#past-bird').options].map(option => option.textContent), ['Choose a bird…', 'Crow', 'Robin']);
 });
