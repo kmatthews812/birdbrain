@@ -6,6 +6,7 @@ import { selectVisualization, visualizations } from '../visualizations/index.jsx
 import Player from './player.jsx';
 import RecentHistory from './recent-history.jsx';
 import ListeningStatus from './listening-status.jsx';
+import { createPlaybackQueue } from '../lib/playback-queue.mjs';
 import { createSound } from '../lib/sound.mjs';
 
 export default function Board({ version }) {
@@ -79,13 +80,24 @@ export default function Board({ version }) {
     setBird(detection);
     setSequence(value => value + 1);
   }, []);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [queue] = useState(() => createPlaybackQueue({
+    play: ({ detection, manual }) => play(detection, manual),
+    onPendingChange: setPendingCount,
+  }));
+  const enqueue = useCallback((detection, manual = false) => {
+    queue.enqueue({ detection, manual });
+  }, [queue]);
+  useEffect(() => () => queue.clear(), [queue]);
   const finish = useCallback(() => {
+    queue.clear();
     setPreview(false);
     setBird(null);
-  }, []);
+  }, [queue]);
 
   useEffect(() => {
     const pause = () => {
+      queue.clear();
       setWatching(false);
       setBird(null);
       setPreview(false);
@@ -101,7 +113,7 @@ export default function Board({ version }) {
       window.removeEventListener('pagehide', pause);
       window.removeEventListener('pageshow', sync);
     };
-  }, []);
+  }, [queue]);
 
   useEffect(() => {
     if (!watching || document.hidden) return;
@@ -127,7 +139,7 @@ export default function Board({ version }) {
       sound.play('/sounds/bird-alert.mp3', alert.signal).catch(() => {
         if (!alert.signal.aborted) setSoundError('Bird alert could not play. Tap the sound button to try again.');
       });
-      play(detection);
+      enqueue(detection);
     });
 
     const controller = new AbortController();
@@ -153,7 +165,7 @@ export default function Board({ version }) {
     };
     window.addEventListener('pagehide', stop);
     return () => { stop(); window.removeEventListener('pagehide', stop); };
-  }, [version, play, updateLastSighting, sound, watching]);
+  }, [version, enqueue, updateLastSighting, sound, watching]);
 
   return (
     <main>
@@ -176,7 +188,7 @@ export default function Board({ version }) {
               <option value="">Choose a bird…</option>
               {seenBirds.map(item => <option key={birdKey(item)} value={birdKey(item)}>{item.commonName}</option>)}
             </select>
-            <button id="show-bird" type="button" disabled={!pastBird || !watching} onClick={() => play(seenBirds.find(item => birdKey(item) === pastBird), true)}>Show bird</button>
+            <button id="show-bird" type="button" disabled={!pastBird || !watching} onClick={() => enqueue(seenBirds.find(item => birdKey(item) === pastBird), true)}>Show bird</button>
             {preview && <><span className="preview-status">Manual preview</span><button id="back-to-live" type="button" onClick={finish}>Back to live</button></>}
             {historyStatus === 'loading' && <span className="history-status">Loading bird history…</span>}
             {historyStatus === 'error' && <><span className="history-status">Could not load previously seen birds.</span><button id="retry-history" type="button" onClick={() => setHistoryAttempt(value => value + 1)}>Retry</button></>}
@@ -186,6 +198,7 @@ export default function Board({ version }) {
             <button id="sound-toggle" type="button" onClick={toggleSound} aria-pressed={soundEnabled} title="Bird detection alerts and visualization audio">{soundEnabled ? 'Mute sound' : soundReady ? 'Unmute sound' : 'Enable sound'}</button>
             {soundError && <p role="status">{soundError}</p>}
           </div>
+          {pendingCount > 0 && <p className="queue-status" role="status">{pendingCount} queued</p>}
           <p className="connection"><i data-online={online} />{!watching ? 'Paused' : online ? 'Live' : 'Connecting'}</p>
         </div>
       </header>
@@ -196,7 +209,7 @@ export default function Board({ version }) {
             <ListeningStatus timestamp={lastSighting} loading={recentStatus === 'loading'} error={recentStatus === 'error'} />
           </>}
         </section>
-        {watching && <RecentHistory onHistory={onHistory} detection={latestDetection} onSelect={detection => play(detection, true)} />}
+        {watching && <RecentHistory onHistory={onHistory} detection={latestDetection} onSelect={detection => enqueue(detection, true)} />}
       </div>
     </main>
   );

@@ -11,8 +11,7 @@ can be added independently.
 **Celebrity Death Match**, also by Kevin, generates a playful claymation fight GIF
 with OpenAI using the current and preceding birds. It waits for an opponent on
 the first detection. To stage a manual matchup, preview one bird, select Celebrity
-Death Match with Randomize unchecked, then preview the second bird. Live events
-received during previews still update the preceding bird for the next matchup.
+Death Match with Randomize unchecked, then preview the second bird. Queued events update the preceding bird when their playback starts.
 The matchup remains visible until another detection or manual selection replaces it. Each matchup generates a new GIF and incurs an image API charge.
 
 **Bird Dance**, by Kevin, generates a fresh looping GIF of the current species
@@ -21,8 +20,9 @@ another detection or manual selection replaces it.
 
 The upper-right selector chooses a specific visualization when **Randomize** is
 unchecked. Randomize is checked by default. Choose a previously seen species and
-press **Show bird** to preview it. Manual previews remain visible until the next live
-detection or another manual selection. **Back to live** clears a manual preview.
+press **Show bird** to preview it. Manual selections join the same queue as live detections. Each view gets at least
+30 seconds before the next queued bird plays. **Back to live** clears the preview
+and any queued birds.
 
 Create a component under `visualizations/`, import it in `visualizations/index.jsx`,
 and add an entry to `visualizations`:
@@ -116,8 +116,14 @@ The Windows task still checks GitHub every minute for updates, even with no view
 
 ## Lifetimes and errors
 
-In live mode, each new detection immediately replaces the previous visualization. Repeated IDs
-within the last 100 detections are ignored. Visualizations have no automatic expiry.
+Each visualization starts a 30-second minimum display period. New detections and
+manual selections wait in arrival order; the header shows how many are queued.
+When that period ends, the next waiting bird starts its own 30-second period.
+If nothing is waiting, the current view stays until another bird arrives. Facts
+and GIFs are generated only when playback starts, using the current visualization
+selector settings. Repeated species still get fresh playback; repeated event IDs
+within the last 100 detections are ignored. Leaving or hiding the page clears the
+queue, so no queued generation runs without a viewer.
 Before the first playback, the stage shows “Listening…” and the elapsed time since
 the latest real sighting, updated every second. Historical previews do not change
 that timestamp. Events received while the page is disconnected or asleep
