@@ -27,7 +27,7 @@ async function mountBoard(t, fetcher = async (url) => Response.json(url === '/ap
     if (url === '/api/tools') return Promise.resolve(Response.json({ result: { data: [{ b64_json: 'R0lGODlh' }] } }));
     if (url === '/api/birds/recent') return Promise.resolve(Response.json({ birds: recent }));
     if (url === '/api/birds/fact') return Promise.resolve(Response.json({ fact: 'A bird fact.', sources: [] }));
-    if (url.includes('info=1')) return Promise.resolve(Response.json({}));
+    if (url.startsWith('/api/birds/photo?')) return Promise.resolve(Response.json({ url: '/test-bird.jpg' }));
     return fetcher(url, options);
   });
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: Date.parse('2026-11-22T18:00:00Z') });

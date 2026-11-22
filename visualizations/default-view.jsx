@@ -5,7 +5,7 @@ export default function DefaultView({ bird, signal }) {
   const [factFailed, setFactFailed] = useState(false);
   const [credit, setCredit] = useState(null);
   const [photoFailed, setPhotoFailed] = useState(false);
-  const photo = `/api/birds/image?species=${encodeURIComponent(bird.scientificName || '')}`;
+  const [photo, setPhoto] = useState(null);
   useEffect(() => {
     const controller = new AbortController();
     const requestSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
@@ -21,15 +21,20 @@ export default function DefaultView({ bird, signal }) {
       return response.json();
     }).then(data => { if (!requestSignal.aborted) setFact(data); })
       .catch(() => { if (!requestSignal.aborted) setFactFailed(true); });
-    fetch(`${photo}&info=1`, { signal: requestSignal }).then(response => {
+    Promise.resolve().then(() => {
+      requestSignal.throwIfAborted();
+      return fetch(`/api/birds/photo?species=${encodeURIComponent(bird.scientificName)}`, { signal: requestSignal, cache: 'no-store' });
+    }).then(response => {
       if (!response.ok) throw new Error('Attribution unavailable');
       return response.json();
-    }).then(data => { if (!requestSignal.aborted) setCredit(data); }).catch(() => {});
+    }).then(data => {
+      if (!requestSignal.aborted) { setPhoto(data.url); setCredit(data); }
+    }).catch(() => { if (!requestSignal.aborted) setPhotoFailed(true); });
     return () => controller.abort();
-  }, [bird.commonName, bird.scientificName, photo, signal]);
+  }, [bird.commonName, bird.scientificName, signal]);
   return <article className="default-view">
     <figure>
-      {photoFailed ? <div className="photo-placeholder">No photo available yet</div> : <img className="bird-photo" src={photo} alt={bird.commonName} onError={() => setPhotoFailed(true)} />}
+      {photoFailed || !photo ? <div className="photo-placeholder">{photoFailed ? 'No photo available yet' : 'Finding a bird photo…'}</div> : <img className="bird-photo" src={photo} alt={bird.commonName} onError={() => setPhotoFailed(true)} />}
       {credit && <figcaption>
         {credit.authorName && <>Photo: {credit.authorURL ? <a href={credit.authorURL} target="_blank" rel="noreferrer">{credit.authorName}</a> : credit.authorName}</>}
         {credit.licenseName && <> · {credit.licenseURL ? <a href={credit.licenseURL} target="_blank" rel="noreferrer">{credit.licenseName}</a> : credit.licenseName}</>}

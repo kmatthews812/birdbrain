@@ -23,10 +23,10 @@ test('shows the species photo, sourced fact and photo attribution without invent
   const calls = [];
   await mount(t, async (url, options) => {
     calls.push({ url, options });
-    return Response.json(url.includes('info=1') ? { authorName: 'Ada', authorURL: 'https://example.com/ada', licenseName: 'CC0', licenseURL: 'https://example.com/license' } : { fact: 'Crows recognize faces.', sources: [{ title: 'Bird research', url: 'https://example.com/crows' }] });
+    return Response.json(url.startsWith('/api/birds/photo?') ? { url: 'https://inaturalist-open-data.s3.amazonaws.com/photos/123/large.jpg', authorName: 'Ada', authorURL: 'https://example.com/ada', licenseName: 'CC0', licenseURL: 'https://example.com/license' } : { fact: 'Crows recognize faces.', sources: [{ title: 'Bird research', url: 'https://example.com/crows' }] });
   });
   assert.equal(document.querySelector('h2').textContent, 'American Crow');
-  assert.equal(document.querySelector('img').getAttribute('src'), '/api/birds/image?species=Corvus%20brachyrhynchos');
+  assert.equal(document.querySelector('img').getAttribute('src'), 'https://inaturalist-open-data.s3.amazonaws.com/photos/123/large.jpg');
   assert.equal(document.querySelector('img').alt, 'American Crow');
   assert.equal(document.querySelector('.fun-fact').textContent, 'Crows recognize faces.');
   assert.deepEqual([...document.querySelectorAll('a')].map(a => [a.textContent, a.href]), [['Ada', 'https://example.com/ada'], ['CC0', 'https://example.com/license'], ['Bird research', 'https://example.com/crows']]);
@@ -39,27 +39,28 @@ test('shows the species photo, sourced fact and photo attribution without invent
 test('keeps bird visible when fact and image are unavailable', async t => {
   await mount(t, async () => Response.json({ error: 'unavailable' }, { status: 502 }));
   assert.equal(document.querySelector('.fun-fact').textContent, 'A fun fact is unavailable right now. Keep listening!');
-  await act(() => document.querySelector('img').dispatchEvent(new window.Event('error')));
+  assert.equal(document.querySelector('img'), null);
   assert.equal(document.querySelector('.photo-placeholder').textContent, 'No photo available yet');
   assert.equal(document.querySelector('h2').textContent, 'American Crow');
 });
 
 test('shows loading and ignores a fact that arrives after cancellation', async t => {
   let resolveFact;
-  const controller = await mount(t, url => url.includes('info=1') ? Promise.resolve(Response.json({})) : new Promise(resolve => { resolveFact = resolve; }));
+  const controller = await mount(t, url => url.startsWith('/api/birds/photo?') ? Promise.resolve(Response.json({ url: 'https://inaturalist-open-data.s3.amazonaws.com/photos/123/large.jpg' })) : new Promise(resolve => { resolveFact = resolve; }));
   assert.equal(document.querySelector('.fun-fact').textContent, 'Finding a fun fact…');
   await act(async () => { controller.abort(); resolveFact(Response.json({ fact: 'Late fact', sources: [] })); });
   assert.equal(document.querySelector('.fun-fact').textContent, 'Finding a fun fact…');
 });
 
 
-test('requests one fresh fact during development StrictMode replay', async t => {
-  let facts = 0;
+test('requests one fresh fact and photo during development StrictMode replay', async t => {
+  let facts = 0, photos = 0;
   await mount(t, async url => {
-    if (url.includes('info=1')) return Response.json({});
+    if (url.startsWith('/api/birds/photo?')) { photos++; return Response.json({ url: '/photo.jpg' }); }
     facts++;
     return Response.json({ fact: 'Fresh fact', sources: [] });
   }, true);
   assert.equal(facts, 1);
+  assert.equal(photos, 1);
   assert.equal(document.querySelector('.fun-fact').textContent, 'Fresh fact');
 });
