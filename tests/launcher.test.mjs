@@ -11,17 +11,16 @@ const commit = 'a'.repeat(40);
 async function fixture(t, marker = commit) {
   const root = await mkdtemp(join(tmpdir(), 'birdbrain-launcher-'));
   t.after(() => rm(root, { recursive: true, force: true }));
-  const app = join(root, 'data', 'app');
+  const app = join(root, 'app');
   const bin = join(app, 'node_modules', 'next', 'dist', 'bin');
   await mkdir(bin, { recursive: true });
-  await mkdir(join(app, '.next'), { recursive: true });
-  if (marker !== null) await writeFile(join(app, '.next', 'BIRD_APP_VERSION'), marker);
+  if (marker !== null) await writeFile(join(app, '.birdbrain-version'), marker);
   const output = join(root, 'launches.jsonl');
   await writeFile(join(bin, 'next'), `
     const fs = require('node:fs');
     fs.appendFileSync(process.env.LAUNCH_OUTPUT, JSON.stringify({
       cwd: process.cwd(), args: process.argv.slice(2),
-      version: process.env.BIRD_APP_VERSION, inherited: process.env.BIRD_TEST_VALUE,
+      nodeEnv: process.env.NODE_ENV, version: process.env.BIRD_APP_VERSION, inherited: process.env.BIRD_TEST_VALUE,
       localEnvFile: fs.readFileSync('.env.local', 'utf8')
     }) + '\\n');
     process.exit(Number(process.env.CHILD_EXIT || 0));
@@ -32,23 +31,23 @@ async function fixture(t, marker = commit) {
 
 function run(root, output, extra = {}) {
   return spawnSync(process.execPath, [launcher, root], {
-    env: { ...process.env, LAUNCH_OUTPUT: output, BIRD_TEST_VALUE: 'inherited', BIRD_APP_VERSION: 'stale', ...extra },
+    env: { ...process.env, LAUNCH_OUTPUT: output, BIRD_TEST_VALUE: 'inherited', BIRD_APP_VERSION: 'stale', NODE_ENV: 'production', ...extra },
     encoding: 'utf8', timeout: 10000,
   });
 }
 
-test('launches exactly one Next server from the stable checkout with its built version', async (t) => {
+test('launches one Next dev command from the stable checkout with its accepted source version', async (t) => {
   const { root, app, output } = await fixture(t);
   const result = run(root, output);
   assert.equal(result.status, 0, result.stderr);
   const launches = (await readFile(output, 'utf8')).trim().split('\n').map(JSON.parse);
   assert.deepEqual(launches, [{
-    cwd: await realpath(app), args: ['start', '--hostname', '0.0.0.0', '--port', '3000'],
-    version: commit, inherited: 'inherited', localEnvFile: 'LOCAL_TEST_VALUE=retained\n',
+    cwd: await realpath(app), args: ['dev', '--hostname', '0.0.0.0', '--port', '3000'],
+    nodeEnv: 'development', version: commit, inherited: 'inherited', localEnvFile: 'LOCAL_TEST_VALUE=retained\n',
   }]);
 });
 
-test('does not launch an unbuilt checkout or an invalid version marker', async (t) => {
+test('does not launch a checkout without an accepted source version', async (t) => {
   for (const marker of [null, '', '../old-release', 'a'.repeat(39)]) {
     const { root, output } = await fixture(t, marker);
     const result = run(root, output);
