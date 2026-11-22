@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 import DefaultView from '../visualizations/default-view.jsx';
 
-async function mount(t, fetcher) {
+async function mount(t, fetcher, strict = false) {
   const dom = new JSDOM('<div id="root"></div>');
   globalThis.window = dom.window;
   globalThis.document = dom.window.document;
@@ -14,7 +14,8 @@ async function mount(t, fetcher) {
   const root = createRoot(document.getElementById('root'));
   const controller = new AbortController();
   t.after(async () => { controller.abort(); await act(() => root.unmount()); dom.window.close(); });
-  await act(() => root.render(<DefaultView bird={{ commonName: 'American Crow', scientificName: 'Corvus brachyrhynchos' }} signal={controller.signal} />));
+  const view = <DefaultView bird={{ commonName: 'American Crow', scientificName: 'Corvus brachyrhynchos' }} signal={controller.signal} />;
+  await act(() => root.render(strict ? <React.StrictMode>{view}</React.StrictMode> : view));
   return controller;
 }
 
@@ -49,4 +50,16 @@ test('shows loading and ignores a fact that arrives after cancellation', async t
   assert.equal(document.querySelector('.fun-fact').textContent, 'Finding a fun fact…');
   await act(async () => { controller.abort(); resolveFact(Response.json({ fact: 'Late fact', sources: [] })); });
   assert.equal(document.querySelector('.fun-fact').textContent, 'Finding a fun fact…');
+});
+
+
+test('requests one fresh fact during development StrictMode replay', async t => {
+  let facts = 0;
+  await mount(t, async url => {
+    if (url.includes('info=1')) return Response.json({});
+    facts++;
+    return Response.json({ fact: 'Fresh fact', sources: [] });
+  }, true);
+  assert.equal(facts, 1);
+  assert.equal(document.querySelector('.fun-fact').textContent, 'Fresh fact');
 });

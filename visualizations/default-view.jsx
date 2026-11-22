@@ -10,9 +10,12 @@ export default function DefaultView({ bird, signal }) {
     const controller = new AbortController();
     const requestSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
     if (!bird.scientificName) { setFactFailed(true); setPhotoFailed(true); return () => controller.abort(); }
-    fetch('/api/birds/fact', {
+    Promise.resolve().then(() => {
+      requestSignal.throwIfAborted();
+      return fetch('/api/birds/fact', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ commonName: bird.commonName, scientificName: bird.scientificName }), signal: requestSignal,
+      });
     }).then(response => {
       if (!response.ok) throw new Error('Fact unavailable');
       return response.json();
