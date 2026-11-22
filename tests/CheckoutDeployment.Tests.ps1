@@ -5,6 +5,7 @@ $remote = Join-Path $root 'remote'
 $app = Join-Path $root 'app'
 $git = (Get-Command git).Source
 function Git-Test([string[]]$Arguments) {
+    $ErrorActionPreference = 'Continue'
     & $git @Arguments | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Test git command failed' }
 }
@@ -72,5 +73,12 @@ try {
     try { Invoke-CheckoutDeployment $app $git $remote 'main' $stop $build $start; throw 'Dirty checkout accepted' }
     catch { if ($_.Exception.Message -notmatch 'local changes') { throw } }
     if ($script:events.Count -ne 0 -or (Get-Content (Join-Path $app 'app.txt')).Trim() -ne 'user edit') { throw 'User edits were touched' }
+    function Test-GitDiagnostic {
+        Write-Error 'Native diagnostic on stderr'
+        $global:LASTEXITCODE = 0
+        'result'
+    }
+    $diagnosticResult = Invoke-CheckoutGit 'Test-GitDiagnostic' $app @('fetch') 2>$null
+    if ($diagnosticResult -ne 'result') { throw 'Successful git diagnostics were treated as failure' }
     Write-Host 'Checkout deployment tests passed.'
 } finally { if (Test-Path $root) { Remove-Item -LiteralPath $root -Recurse -Force } }

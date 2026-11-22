@@ -1,4 +1,5 @@
 function Invoke-CheckoutGit($Git, $App, [string[]]$Arguments) {
+    $ErrorActionPreference = 'Continue'
     $output = & $Git -C $App @Arguments
     if ($LASTEXITCODE -ne 0) { throw "Git $($Arguments[0]) failed with exit code $LASTEXITCODE." }
     return $output
