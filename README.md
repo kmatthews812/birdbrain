@@ -70,7 +70,10 @@ Windows BirdNET-Go server, then run `npm run dev`.
 ## Visualization framework
 
 Each new detection plays a registered React visualization with the complete bird
-payload, its name, and creator credit. The rings are the starter. Tools support
+payload, its name, and creator credit. **Default View**, by Kevin, shows a bird
+photo and sourced fun fact. **Randomize** is on by default; uncheck it to select a
+visualization. The previously seen birds selector and **Show bird** let you preview
+any recorded species, then **Back to live** resumes listening. Tools support
 BirdNET JSON REST queries, OpenAI text, web search, PNG/GIF generation, and sound.
 See [the author guide](docs/visualizations.md) for the component contract and examples.
 

@@ -3,8 +3,14 @@
 A visualization is a React component plus a registry entry. The framework selects
 one at random for each new BirdNET-Go detection, avoiding the previous choice
 when more than one is registered. It passes the entire validated detection as
-`bird`, a `tools` object, and an `AbortSignal` named `signal`. The existing rings
-are the starter visualization; family creations can be added independently.
+`bird`, a `tools` object, and an `AbortSignal` named `signal`. **Default View**,
+created by Kevin, shows a BirdNET-Go photo and a sourced fun fact. Family creations
+can be added independently.
+
+The upper-right selector chooses a specific visualization when **Randomize** is
+unchecked. Randomize is checked by default. Choose a previously seen species and
+press **Show bird** to preview it. Manual previews are not interrupted by live
+detections; **Back to live** or the visualization timeout resumes live playback.
 
 Create a component under `visualizations/`, import it in `visualizations/index.jsx`,
 and add an entry to `visualizations`:
@@ -31,7 +37,8 @@ export default function BirdParty({ bird }) {
 }
 ```
 
-`bird` always has `commonName` and `confidence` (0–1). BirdNET-Go may also supply
+`bird` always has `commonName`. Live detections have `confidence` (0–1); historical
+species previews do not. BirdNET-Go may also supply
 `id`, `scientificName`, `speciesCode`, `timestamp`, `source`, `clipName`, `birdImage`,
 and other fields. Treat those as optional. The framework displays the creation's
 name and author below the stage.
@@ -68,9 +75,10 @@ search citations as visible links. Do not assume the first output item is a mess
 The API supports [web search](https://developers.openai.com/api/docs/guides/tools-web-search)
 and [animated GIF output](https://developers.openai.com/api/docs/guides/image-generation#generate-animated-gif-output).
 Model access depends on the configured OpenAI account. Calls incur API charges;
-no AI calls happen in the built-in rings visualization. There is no asset cache or
-spending quota in this initial framework. Prefer prepared assets or caching in a
-future visualization when generation would be slow or repeated.
+Default View uses web search for its fun fact and caches successful facts per
+species for 24 hours in server memory (up to 256 species). Concurrent lookups share
+one request. Photos are cached for a day. There is no spending quota; other
+visualizations should cache expensive repeated generation.
 
 Put sound assets in `public/sounds/`. Tap **Enable sound** once after opening or
 reloading the page. `playSound` returns `false` when muted and `true` when playback
@@ -79,7 +87,7 @@ The same audio context is reused after that tap; muting stops active sounds.
 
 ## Lifetimes and errors
 
-Each new detection immediately replaces the previous visualization. Repeated IDs
+In live mode, each new detection immediately replaces the previous visualization. Repeated IDs
 within the last 100 detections are ignored. After `durationMs`, the stage returns
 to “Listening for owls.” Events received while the page is disconnected or asleep
 are not replayed; this is a live display, not a durable event log.
