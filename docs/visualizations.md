@@ -5,7 +5,7 @@ one at random for each new BirdNET-Go detection, avoiding the previous choice
 when more than one is registered. It passes the entire validated detection as
 `bird`, the preceding bird as `previousBird` (or `null` for the first bird), a
 `tools` object, and an `AbortSignal` named `signal`. **Default View**,
-created by Kevin, shows a BirdNET-Go photo and a sourced fun fact. Family creations
+created by Kevin, shows a rotating species photo and a sourced fun fact. Family creations
 can be added independently.
 
 **Celebrity Death Match**, also by Kevin, generates a playful claymation fight GIF
@@ -85,7 +85,10 @@ Model access depends on the configured OpenAI account. Calls incur API charges;
 Default View makes a fresh web-search request for each playback, including repeat
 sightings of the same species. Facts and generated GIFs are not cached or shared
 between playbacks. OpenAI may still return a similar fact on a new request. Photos
-are cached for a day. There is no spending quota; other
+are selected from licensed iNaturalist species photos, avoiding the previous image
+when alternatives exist. Candidate lists refresh hourly; each playback selects
+again. Photo credits travel with the selected image. BirdNET-Go’s cached image
+is the fallback when alternatives cannot be loaded. There is no spending quota; other
 visualizations should cache expensive repeated generation.
 
 Put sound assets in `public/sounds/`. Tap **Enable sound** once after opening or
