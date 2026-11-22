@@ -70,3 +70,4 @@ button:disabled { opacity: .5; cursor: default; }
 @media (max-width: 640px) { .display-layout { grid-template-columns: minmax(0, 1fr); } .recent-history { max-height: 45vh; } }
 
 @media (max-width: 1100px) { header { flex-wrap: wrap; } .header-controls { justify-content: flex-start; } }
+@media (min-width: 641px) and (max-width: 1100px) { .header-controls { gap: .75rem; } .header-controls select { font-size: .9rem; } .preview-controls select { width: 12rem; } }
