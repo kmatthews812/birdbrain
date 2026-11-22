@@ -121,3 +121,47 @@ test('removes parenthesized Markdown source citations while preserving parenthet
     sources: [{ title: 'Crow research', url: 'https://example.org/crows' }],
   });
 });
+
+test('excludes recent facts and their paraphrases from subsequent species prompts', async () => {
+  const prompts = [];
+  const handle = createBirdFactHandler({ env: { OPENAI_API_KEY: 'test' }, fetch: async (_url, options) => {
+    prompts.push(JSON.parse(options.body).input);
+    return Response.json(result(prompts.length === 1 ? 'Crows recognize faces.' : 'Crows use tools.'));
+  } });
+  await handle(request());
+  assert.equal((await (await handle(request())).json()).fact, 'Crows use tools.');
+  assert.match(prompts[1], /Crows recognize faces\./);
+  assert.match(prompts[1], /different underlying fact/);
+  assert.match(prompts[1], /Do not repeat or paraphrase/);
+});
+
+test('retries a normalized duplicate once and returns only the new fact', async () => {
+  const outputs = ['Crows recognize faces.', ' CROWS   recognize faces! ', 'Crows use tools.'];
+  let calls = 0;
+  const handle = createBirdFactHandler({ env: { OPENAI_API_KEY: 'test' }, fetch: async () => Response.json(result(outputs[calls++])) });
+  await handle(request());
+  const response = await handle(request());
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).fact, 'Crows use tools.');
+  assert.equal(calls, 3);
+});
+
+test('stops after two attempts instead of returning a repeated fact', async () => {
+  let calls = 0;
+  const handle = createBirdFactHandler({ env: { OPENAI_API_KEY: 'test' }, fetch: async () => { calls++; return Response.json(result('Crows recognize faces.')); } });
+  await handle(request());
+  const response = await handle(request());
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), { error: 'A new sourced bird fact is unavailable right now.' });
+  assert.equal(calls, 3);
+});
+
+test('simultaneous responses cannot return the same fact for a species', async () => {
+  let calls = 0;
+  const handle = createBirdFactHandler({ env: { OPENAI_API_KEY: 'test' }, fetch: async () => {
+    return Response.json(result(++calls <= 2 ? 'Crows recognize faces.' : 'Crows use tools.'));
+  } });
+  const responses = await Promise.all([handle(request()), handle(request())]);
+  assert.deepEqual(await Promise.all(responses.map(async response => (await response.json()).fact)), ['Crows recognize faces.', 'Crows use tools.']);
+  assert.equal(calls, 3);
+});
