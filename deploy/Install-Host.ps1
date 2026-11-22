@@ -45,12 +45,14 @@ Invoke-Checked icacls.exe @($root, '/inheritance:r', '/grant:r',
 
 $data = Join-Path $root 'data'
 $serviceLogs = Join-Path $root 'service-logs'
-New-Item -Path (Join-Path $data 'releases'), $serviceLogs -ItemType Directory -Force | Out-Null
+New-Item -Path $data, $serviceLogs -ItemType Directory -Force | Out-Null
 Invoke-Checked icacls.exe @($data, '/grant:r', "*${sid}:(OI)(CI)M")
 Invoke-Checked icacls.exe @($serviceLogs, '/grant:r', '*S-1-5-19:(OI)(CI)M')
 Copy-Item -LiteralPath @(
     (Join-Path $PSScriptRoot 'Deploy.ps1'),
-    (Join-Path $PSScriptRoot 'ReleaseState.ps1'),
+    (Join-Path $PSScriptRoot 'CheckoutDeployment.ps1'),
+    (Join-Path $PSScriptRoot 'Service.ps1'),
+    (Join-Path $PSScriptRoot 'LegacyCleanup.ps1'),
     (Join-Path $PSScriptRoot 'Start-BirdBrain.mjs')
 ) -Destination $root -Force
 @{ git = $Git; node = $Node; npm = $npm; remote = $remote; branch = $branch } |
