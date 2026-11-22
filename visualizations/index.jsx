@@ -1,17 +1,7 @@
-import React from 'react';
-
-function Rings({ bird }) {
-  return <>
-    <div className="rings" data-detected="true" aria-hidden="true" />
-    <div className="caption">
-      <h2>{bird.commonName}</h2>
-      <p>{Math.round(bird.confidence * 100)}% confidence</p>
-    </div>
-  </>;
-}
+import DefaultView from './default-view.jsx';
 
 export const visualizations = [
-  { id: 'default-view', name: 'Default View', createdBy: 'Kevin', durationMs: 20000, Component: Rings },
+  { id: 'default-view', name: 'Default View', createdBy: 'Kevin', durationMs: 60000, Component: DefaultView },
 ];
 
 export function selectVisualization(entries, previousId, random = Math.random) {

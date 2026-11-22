@@ -20,7 +20,11 @@ async function mountBoard(t, fetcher = async (url) => Response.json(url === '/ap
     close() { this.closed = true; }
     emit(type, data) { this.dispatchEvent(new dom.window.MessageEvent(type, { data: JSON.stringify(data) })); }
   };
-  t.mock.method(globalThis, 'fetch', fetcher);
+  t.mock.method(globalThis, 'fetch', (url, options) => {
+    if (url === '/api/birds/fact') return Promise.resolve(Response.json({ fact: 'A bird fact.', sources: [] }));
+    if (url.includes('info=1')) return Promise.resolve(Response.json({}));
+    return fetcher(url, options);
+  });
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
   const root = createRoot(document.getElementById('root'));
   t.after(async () => { await act(() => root.unmount()); assert.equal(source.closed, true); dom.window.close(); });
