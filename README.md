@@ -73,7 +73,10 @@ Each new detection plays a registered React visualization with the complete bird
 payload, its name, and creator credit. **Default View**, by Kevin, shows a bird
 photo and sourced fun fact. **Randomize** is on by default; uncheck it to select a
 visualization. The previously seen birds selector and **Show bird** let you preview
-any recorded species, then **Back to live** resumes listening. Tools support
+any recorded species, then **Back to live** resumes listening. The **Recent sightings**
+sidebar lists the latest 30 individual detections, with exact dates and times in
+the viewing device’s time zone. Click a sighting to play it with the current
+visualization selection; new detections appear live. Tools support
 BirdNET JSON REST queries, OpenAI text, web search, PNG/GIF generation, and sound.
 See [the author guide](docs/visualizations.md) for the component contract and examples.
 
