@@ -143,3 +143,31 @@ test('web search forces the hosted search tool and preserves citations in the re
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {result});
 });
+
+test('generates PNG and animated GIF assets through the Images API', async () => {
+  for (const format of [undefined, 'gif']) {
+    const result = {data:[{b64_json:'aW1hZ2U='}]};
+    const response = await handleToolRequest(request({tool:'image',input:{prompt:'A dancing robin',format}}), {
+      env:{OPENAI_API_KEY:'key'},fetch:async (url, options) => {
+        assert.equal(String(url), 'https://api.openai.com/v1/images/generations');
+        assert.deepEqual(JSON.parse(options.body), {model:'gpt-image-2.6-flare',prompt:'A dancing robin',n:1,output_format:format || 'png'});
+        return Response.json(result);
+      },
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {result});
+  }
+});
+
+test('uses the configured image model and rejects unsupported image formats', async () => {
+  const response = await handleToolRequest(request({tool:'image',input:{prompt:'A robin'}}), {
+    env:{OPENAI_API_KEY:'key',OPENAI_IMAGE_MODEL:'custom-image-model'}, fetch:async (_url, options) => {
+      assert.equal(JSON.parse(options.body).model, 'custom-image-model');
+      return Response.json({data:[]});
+    },
+  });
+  assert.equal(response.status, 200);
+  const invalid = await handleToolRequest(request({tool:'image',input:{prompt:'A robin',format:'exe'}}), {env:{OPENAI_API_KEY:'key'},fetch:() => assert.fail('must not fetch')});
+  assert.equal(invalid.status, 400);
+  assert.deepEqual(await invalid.json(), {error:'Image format must be png or gif.'});
+});
