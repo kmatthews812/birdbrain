@@ -3,9 +3,9 @@ import test from 'node:test';
 import { createBirdFactHandler } from '../lib/bird-facts.mjs';
 
 const bird = { commonName: 'American Crow', scientificName: 'Corvus brachyrhynchos' };
-function request(body = bird, origin = 'http://birdbrain.test:3000') {
+function request(body = bird, origin = 'http://birdbrain.test:3000', signal) {
   return new Request('http://localhost:3000/api/birds/fact', {
-    method: 'POST', headers: { Host: 'birdbrain.test:3000', Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    method: 'POST', headers: { Host: 'birdbrain.test:3000', Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal,
   });
 }
 function result(text = 'American crows can recognize individual human faces. citeturn0search0') {
@@ -121,4 +121,42 @@ test('bounds successful cached species to 256 entries', async () => {
   assert.equal(calls, 257);
   await handle(request({ ...bird, scientificName: 'Species 0' }));
   assert.equal(calls, 258);
+});
+
+test('one cancelled subscriber does not cancel a shared fact needed by another', async () => {
+  let upstreamSignal;
+  let release;
+  const handle = createBirdFactHandler({ env: { OPENAI_API_KEY: 'test' }, fetch: async (_url, options) => {
+    upstreamSignal = options.signal;
+    await new Promise(resolve => { release = resolve; });
+    return Response.json(result());
+  } });
+  const controller = new AbortController();
+  const first = handle(request(bird, 'http://birdbrain.test:3000', controller.signal));
+  const second = handle(request());
+  await new Promise(resolve => setImmediate(resolve));
+  controller.abort();
+  assert.equal(upstreamSignal.aborted, false);
+  assert.equal((await first).status, 499);
+  release();
+  assert.equal((await second).status, 200);
+});
+
+test('cancels upstream when its last subscriber leaves and allows a fresh retry', async () => {
+  let calls = 0;
+  let upstreamSignal;
+  const handle = createBirdFactHandler({ env: { OPENAI_API_KEY: 'test' }, fetch: async (_url, options) => {
+    calls++;
+    upstreamSignal = options.signal;
+    if (calls > 1) return Response.json(result());
+    return new Promise((_resolve, reject) => options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true }));
+  } });
+  const controller = new AbortController();
+  const first = handle(request(bird, 'http://birdbrain.test:3000', controller.signal));
+  await new Promise(resolve => setImmediate(resolve));
+  controller.abort();
+  assert.equal(upstreamSignal.aborted, true);
+  assert.equal((await first).status, 499);
+  assert.equal((await handle(request())).status, 200);
+  assert.equal(calls, 2);
 });
