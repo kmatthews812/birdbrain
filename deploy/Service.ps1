@@ -2,7 +2,9 @@ function Get-BirdBrainProcesses($Root) {
     $prefix = [regex]::Escape($Root.Replace('/', '\').TrimEnd('\'))
     $node = '^(?:"[^"]*\\node\.exe"|[^\s"]*node\.exe)\s+"?'
     $launcher = $node + $prefix + '\\Start-BirdBrain\.mjs(?=$|[\s"])'
-    $next = $node + $prefix + '\\data\\(?:app|releases\\[0-9a-f]{40})\\node_modules\\next\\dist\\bin\\next(?=$|[\s"])'
+    $app = $prefix + '\\(?:app|data\\releases\\[0-9a-f]{40})\\node_modules\\next\\dist\\'
+    $next = $node + $app + 'bin\\next(?=$|[\s"])'
+    $worker = $node + $app + 'server\\lib\\start-server\.js(?=$|[\s"])'
     foreach ($process in (Get-CimInstance -ClassName Win32_Process -Filter "Name = 'node.exe'" -ErrorAction Stop)) {
         if (-not $process.CommandLine) { continue }
         $command = $process.CommandLine.Replace('/', '\')
@@ -10,6 +12,8 @@ function Get-BirdBrainProcesses($Root) {
             [pscustomobject]@{ Id = $process.ProcessId; Kind = 'launcher' }
         } elseif ($command -match $next) {
             [pscustomobject]@{ Id = $process.ProcessId; Kind = 'next' }
+        } elseif ($command -match $worker) {
+            [pscustomobject]@{ Id = $process.ProcessId; Kind = 'worker' }
         }
     }
 }
@@ -59,12 +63,15 @@ function Start-BirdBrain($Root, $Commit) {
                 $descendants += $children
                 $parents = @($children | Select-Object -ExpandProperty ProcessId)
             }
+            $launchers = @($nodes | Where-Object { $_.ParentProcessId -eq $serviceProcess.ProcessId })
+            $commands = @($nodes | Where-Object { $_.ParentProcessId -in $launchers.ProcessId })
+            # Next dev forks start-server.js; compiler workers may live beneath that listener.
+            $workers = @($nodes | Where-Object { $_.ParentProcessId -in $commands.ProcessId })
             $owners = @(Get-BirdBrainListeners | Select-Object -ExpandProperty OwningProcess -Unique)
-            $owner = @($descendants | Where-Object { $_.ProcessId -in $owners })
             $extras = @(Get-BirdBrainProcesses $Root | Where-Object { $_.Id -notin $descendants.ProcessId })
-            if ($descendants.Count -ne 2 -or $owners.Count -ne 1 -or $owner.Count -ne 1 -or
-                $owner[0].ParentProcessId -notin $descendants.ProcessId -or $extras.Count -gt 0) {
-                throw 'Expected exactly one BirdBrain Next server owning port 3000 beneath its service launcher.'
+            if ($serviceProcess.ProcessId -le 0 -or $launchers.Count -ne 1 -or $commands.Count -ne 1 -or
+                $workers.Count -ne 1 -or $owners.Count -ne 1 -or $owners[0] -ne $workers[0].ProcessId -or $extras.Count -gt 0) {
+                throw 'Expected exactly one BirdBrain Next server owning port 3000 beneath its service launcher and dev command.'
             }
             return
         }

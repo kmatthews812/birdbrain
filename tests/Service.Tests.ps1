@@ -77,17 +77,18 @@ function Invoke-RestMethod {
 Reset-Fixture
 $script:processes = @(
     (New-Node 10 '"C:\Program Files\nodejs\node.exe" "C:\ProgramData\BirdBrain\Start-BirdBrain.mjs" "C:\ProgramData\BirdBrain"'),
-    (New-Node 11 'node.exe C:/ProgramData/BirdBrain/data/app/node_modules/next/dist/bin/next start'),
+    (New-Node 11 'node.exe C:/ProgramData/BirdBrain/app/node_modules/next/dist/bin/next start'),
     (New-Node 12 "node.exe C:\ProgramData\BirdBrain\data\releases\$commit\node_modules\next\dist\bin\next start"),
+    (New-Node 13 'node.exe C:\ProgramData\BirdBrain\app\node_modules\next\dist\server\lib\start-server.js'),
     (New-Node 20 'node.exe C:\OtherApp\node_modules\next\dist\bin\next start'),
     (New-Node 21 'node.exe C:\ProgramData\BirdBrain-other\Start-BirdBrain.mjs'),
     (New-Node 22 'node.exe C:\ProgramData\BirdBrain\data\releases\not-a-commit\node_modules\next\dist\bin\next start'),
-    (New-Node 23 'node.exe C:\ProgramData\BirdBrain\data\app\node_modules\next\dist\bin\next-other start'),
+    (New-Node 23 'node.exe C:\ProgramData\BirdBrain\app\node_modules\next\dist\bin\next-other start'),
     (New-Node 24 'node.exe C:\OtherApp\inspect.js C:\ProgramData\BirdBrain\Start-BirdBrain.mjs')
 )
 $script:listeners = @([pscustomobject]@{ LocalPort = 3000; OwningProcess = 11 })
 Stop-BirdBrain -Root $root
-Assert-Equal @($script:events) @('service:stop', 'wait:Stopped', 'kill:10', 'kill:11', 'kill:12') 'Stop must precede narrow cleanup'
+Assert-Equal @($script:events) @('service:stop', 'wait:Stopped', 'kill:10', 'kill:11', 'kill:12', 'kill:13') 'Stop must precede narrow cleanup'
 Assert-Equal @($script:processes.ProcessId) @(20, 21, 22, 23, 24) 'Unrelated processes must survive'
 
 Reset-Fixture
@@ -102,38 +103,47 @@ Reset-Fixture
 $script:status = 'Stopped'
 $script:processes = @(
     (New-Node 10 'node.exe C:\ProgramData\BirdBrain\Start-BirdBrain.mjs' 5),
-    (New-Node 11 'node.exe C:\ProgramData\BirdBrain\data\app\node_modules\next\dist\bin\next start' 10)
+    (New-Node 11 'node.exe C:\ProgramData\BirdBrain\app\node_modules\next\dist\bin\next dev' 10),
+    (New-Node 12 'node.exe C:\ProgramData\BirdBrain\app\node_modules\next\dist\server\lib\start-server.js' 11)
 )
-$script:listeners = @([pscustomobject]@{ LocalPort = 3000; OwningProcess = 11 }, [pscustomobject]@{ LocalPort = 3000; OwningProcess = 11 })
+$script:listeners = @([pscustomobject]@{ LocalPort = 3000; OwningProcess = 12 }, [pscustomobject]@{ LocalPort = 3000; OwningProcess = 12 })
 Start-BirdBrain -Root $root -Commit $commit
 Start-BirdBrain -Root $root -Commit $commit
 Assert-Equal @($script:events) @('service:start') 'An already running service must not launch another server'
 
-$script:processes += New-Node 12 "node.exe C:\ProgramData\BirdBrain\data\releases\$commit\node_modules\next\dist\bin\next start"
+$script:processes += New-Node 14 "node.exe C:\ProgramData\BirdBrain\data\releases\$commit\node_modules\next\dist\bin\next start"
 Assert-Throws { Start-BirdBrain -Root $root -Commit $commit } '*exactly one BirdBrain Next server*'
 Assert-Equal @($script:events) @('service:start') 'Duplicate detection must not start another service'
 
 Reset-Fixture
-$script:processes = @((New-Node 11 'node.exe C:\ProgramData\BirdBrain\data\app\node_modules\next\dist\bin\next start' 10))
+$script:processes = @((New-Node 11 'node.exe C:\ProgramData\BirdBrain\app\node_modules\next\dist\bin\next start' 10))
 $script:listeners = @([pscustomobject]@{ LocalPort = 3000; OwningProcess = 20 })
 Assert-Throws { Start-BirdBrain -Root $root -Commit $commit } '*exactly one BirdBrain Next server*'
 
 Reset-Fixture
-$script:processes = @((New-Node 10 $null 5), (New-Node 11 $null 10), (New-Node 20 $null 999))
-$script:listeners = @([pscustomobject]@{ LocalPort = 3000; OwningProcess = 11 })
+$script:processes = @((New-Node 10 $null 5), (New-Node 11 $null 10), (New-Node 12 $null 11), (New-Node 20 $null 999))
+$script:listeners = @([pscustomobject]@{ LocalPort = 3000; OwningProcess = 12 })
 Start-BirdBrain -Root $root -Commit $commit
 Assert-Equal @($script:events) @() 'A healthy LocalService tree must verify without readable command lines'
 
-$script:processes += New-Node 12 $null 10
+$script:processes += New-Node 14 $null 10
 Assert-Throws { Start-BirdBrain -Root $root -Commit $commit } '*exactly one BirdBrain Next server*'
 
 Reset-Fixture
-$script:processes = @((New-Node 10 $null 5), (New-Node 11 $null 10), (New-Node 20 $null 999))
+$script:processes = @((New-Node 10 $null 5), (New-Node 11 $null 10), (New-Node 12 $null 11), (New-Node 20 $null 999))
 $script:listeners = @([pscustomobject]@{ LocalPort = 3000; OwningProcess = 20 })
 Assert-Throws { Start-BirdBrain -Root $root -Commit $commit } '*exactly one BirdBrain Next server*'
 
 $script:status = 'Stopped'
 Assert-Throws { Stop-BirdBrain -Root $root } '*Port 3000*'
 Assert-Equal @($script:events) @() 'Unknown process identities must never be killed'
+
+Reset-Fixture
+$script:processes = @((New-Node 10 $null 5), (New-Node 11 $null 10), (New-Node 12 $null 11), (New-Node 13 $null 12))
+$script:listeners = @([pscustomobject]@{ LocalPort = 3000; OwningProcess = 12 })
+Start-BirdBrain -Root $root -Commit $commit
+Assert-Equal @($script:events) @() 'Next compiler workers beneath the dev listener are not additional servers'
+$script:processes += New-Node 14 $null 11
+Assert-Throws { Start-BirdBrain -Root $root -Commit $commit } '*exactly one BirdBrain Next server*'
 
 Write-Host 'Service lifecycle tests passed.'
