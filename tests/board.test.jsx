@@ -302,6 +302,7 @@ test('alerts once for each new detection, including repeat species, and header m
 
 test('page departure cancels generation and stops detections until a viewer returns', async t => {
   const { source, getSource, requests } = await mountBoard(t);
+  await act(() => document.querySelector('#randomize').click());
   await act(() => source.emit('detection', robin));
   await act(() => source.emit('detection', { ...robin, id: 43 }));
   const fact = requests.find(call => call.url === '/api/birds/fact');
@@ -318,7 +319,8 @@ test('page departure cancels generation and stops detections until a viewer retu
   await act(() => window.dispatchEvent(new window.Event('pageshow')));
   assert.notEqual(getSource(), source);
   assert.equal(document.querySelector('section h2').textContent, 'Listening…');
-  assert.equal(requests.filter(call => call.url === '/api/birds/fact').length, 1);
+  assert.equal(requests.filter(call => call.url === '/api/birds/fact').length, 2);
+  assert.equal(requests.filter(call => call.url === '/api/birds/fact').every(call => call.options.signal.aborted), true);
 });
 
 test('hidden tabs pause external work and resume listening without replaying missed birds', async t => {
@@ -335,7 +337,7 @@ test('hidden tabs pause external work and resume listening without replaying mis
   assert.equal(requests.filter(call => call.url === '/api/birds/fact').length, 0);
 });
 
-test('queues every distinct detection for thirty seconds without generating upcoming views early', async t => {
+test('prepares queued views once and reveals them in order without restarting requests', async t => {
   const { source, requests } = await mountBoard(t);
   await act(() => document.querySelector('#randomize').click());
   const facts = () => requests.filter(call => call.url === '/api/birds/fact').length;
@@ -346,15 +348,19 @@ test('queues every distinct detection for thirty seconds without generating upco
   await act(() => source.emit('detection', { ...robin, id: 44 }));
   assert.equal(document.querySelector('section h2').textContent, 'Robin');
   assert.equal(document.querySelector('.next-bird').textContent, 'Next bird in 25 seconds');
-  assert.equal(facts(), 1);
+  assert.equal(facts(), 3);
+  const prepared = [...document.querySelectorAll('[data-playback] article')];
+  assert.equal(prepared.length, 3);
+  assert.equal(prepared[1].closest('[data-playback]').hidden, true);
   await act(() => t.mock.timers.tick(24999));
-  assert.equal(facts(), 1);
+  assert.equal(facts(), 3);
   await act(() => t.mock.timers.tick(1));
   assert.equal(document.querySelector('section h2').textContent, 'Crow');
+  assert.equal(document.querySelector('[data-playback]:not([hidden]) article'), prepared[1]);
   assert.equal(document.querySelector('.next-bird').textContent, 'Next bird in 30 seconds');
-  assert.equal(facts(), 2);
+  assert.equal(facts(), 3);
   await act(() => t.mock.timers.tick(29999));
-  assert.equal(facts(), 2);
+  assert.equal(facts(), 3);
   await act(() => t.mock.timers.tick(1));
   assert.equal(document.querySelector('section h2').textContent, 'Robin');
   assert.equal(document.querySelector('.queue-status'), null);

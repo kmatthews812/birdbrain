@@ -93,3 +93,5 @@ button:disabled { opacity: .5; cursor: default; }
   color: white;
   z-index: 2;
 }
+[data-playback]:not([hidden]) { display: contents; }
+.recent-history button[aria-current="true"] time { color: #36583b; }

@@ -40,8 +40,9 @@ export default function Board({ version }) {
   }, [updateLastSighting]);
   const [bird, setBird] = useState(null);
   const [startedAt, setStartedAt] = useState(0);
-  const [sequence, setSequence] = useState(0);
-  const [visualization, setVisualization] = useState(null);
+  const nextSequence = useRef(0);
+  const [activeId, setActiveId] = useState(null);
+  const [entries, setEntries] = useState([]);
   const [seenBirds, setSeenBirds] = useState([]);
   const [pastBird, setPastBird] = useState('');
   const [historyStatus, setHistoryStatus] = useState('loading');
@@ -49,7 +50,6 @@ export default function Board({ version }) {
   const [preview, setPreview] = useState(false);
   const previous = useRef(null);
   const lastBird = useRef(null);
-  const [previousBird, setPreviousBird] = useState(null);
   useEffect(() => {
     if (!watching || document.hidden) return;
     const controller = new AbortController();
@@ -70,30 +70,34 @@ export default function Board({ version }) {
   const [selectedId, setSelectedId] = useState(visualizations[0].id);
   const options = useRef();
   options.current = { randomize, selectedId };
-  const play = useCallback((detection, manual = false) => {
+  const play = useCallback(item => {
     setStartedAt(Date.now());
-    setPreview(manual);
-    const next = options.current.randomize
-      ? selectVisualization(visualizations, previous.current)
-      : visualizations.find(item => item.id === options.current.selectedId);
-    previous.current = next?.id;
-    setVisualization(next);
-    setPreviousBird(lastBird.current);
-    lastBird.current = detection;
-    setBird(detection);
-    setSequence(value => value + 1);
+    setPreview(item.manual);
+    setBird(item.detection);
+    setActiveId(item.id);
+    setEntries(current => current.filter(entry => entry.id >= item.id));
   }, []);
   const [pendingCount, setPendingCount] = useState(0);
   const [queue] = useState(() => createPlaybackQueue({
-    play: ({ detection, manual }) => play(detection, manual),
+    play,
     onPendingChange: setPendingCount,
   }));
   const enqueue = useCallback((detection, manual = false) => {
-    queue.enqueue({ detection, manual });
+    const visualization = options.current.randomize
+      ? selectVisualization(visualizations, previous.current)
+      : visualizations.find(item => item.id === options.current.selectedId);
+    const item = { id: ++nextSequence.current, detection, manual, visualization, previousBird: lastBird.current };
+    previous.current = visualization?.id;
+    lastBird.current = detection;
+    setEntries(current => [...current, item]);
+    queue.enqueue(item);
   }, [queue]);
   useEffect(() => () => queue.clear(), [queue]);
   const finish = useCallback(() => {
     queue.clear();
+    setEntries([]);
+    lastBird.current = null;
+    previous.current = null;
     setPreview(false);
     setBird(null);
   }, [queue]);
@@ -101,6 +105,9 @@ export default function Board({ version }) {
   useEffect(() => {
     const pause = () => {
       queue.clear();
+      setEntries([]);
+      lastBird.current = null;
+      previous.current = null;
       setWatching(false);
       setBird(null);
       setPreview(false);
@@ -206,7 +213,7 @@ export default function Board({ version }) {
       </header>
       <div className="display-layout">
         <section aria-live="polite">
-          {!watching ? <div className="caption"><h2>Paused</h2><p>BirdBrain resumes when you return to this tab.</p></div> : bird && visualization ? <Player key={sequence} visualization={visualization} bird={bird} previousBird={previousBird} sound={sound} /> : <>
+          {!watching ? <div className="caption"><h2>Paused</h2><p>BirdBrain resumes when you return to this tab.</p></div> : bird ? entries.map(item => <div key={item.id} data-playback={item.id} hidden={item.id !== activeId}><Player visualization={item.visualization} bird={item.detection} previousBird={item.previousBird} sound={sound} active={item.id === activeId} /></div>) : <>
             <div className="rings" aria-hidden="true" />
             <ListeningStatus timestamp={lastSighting} loading={recentStatus === 'loading'} error={recentStatus === 'error'} />
           </>}

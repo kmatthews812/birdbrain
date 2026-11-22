@@ -1,20 +1,22 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createTools } from '../lib/visualization-tools.mjs';
 
-export default function Player({ visualization, bird, previousBird, sound }) {
+export default function Player({ visualization, bird, previousBird, sound, active = true }) {
+  const isActive = useRef(active);
+  isActive.current = active;
   const [session, setSession] = useState(null);
   useEffect(() => {
     const controller = new AbortController();
-    setSession({ cancel: () => controller.abort(), signal: controller.signal, tools: createTools({ signal: controller.signal, sound }) });
+    setSession({ cancel: () => controller.abort(), signal: controller.signal, tools: createTools({ signal: controller.signal, sound: { play: (url, signal) => isActive.current && sound ? sound.play(url, signal) : Promise.resolve(false) } }) });
     const cancel = () => controller.abort();
     window.addEventListener('pagehide', cancel);
     return () => { window.removeEventListener('pagehide', cancel); cancel(); };
   }, [visualization, sound]);
   const Component = visualization.Component;
   return <>
-    {session && <VisualizationBoundary bird={bird} onError={session.cancel}><Component bird={bird} previousBird={previousBird} tools={session.tools} signal={session.signal} /></VisualizationBoundary>}
+    {session && <VisualizationBoundary bird={bird} onError={session.cancel}><Component active={active} bird={bird} previousBird={previousBird} tools={session.tools} signal={session.signal} /></VisualizationBoundary>}
     <p className="credit">{visualization.name} · Created by {visualization.createdBy}</p>
   </>;
 }
