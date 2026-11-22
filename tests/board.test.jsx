@@ -15,6 +15,7 @@ async function mountBoard(t, fetcher = async (url) => Response.json(url === '/ap
   globalThis.document = dom.window.document;
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   let source, resumed = 0;
+  const requests = [];
   window.AudioContext = class { async resume() { resumed++; } async close() {} };
   globalThis.EventSource = class extends dom.window.EventTarget {
     constructor(url) { super(); this.url = url; source = this; }
@@ -22,6 +23,8 @@ async function mountBoard(t, fetcher = async (url) => Response.json(url === '/ap
     emit(type, data) { this.dispatchEvent(new dom.window.MessageEvent(type, { data: JSON.stringify(data) })); }
   };
   t.mock.method(globalThis, 'fetch', (url, options) => {
+    requests.push({ url, options });
+    if (url === '/api/tools') return Promise.resolve(Response.json({ result: { data: [{ b64_json: 'R0lGODlh' }] } }));
     if (url === '/api/birds/recent') return Promise.resolve(Response.json({ birds: recent }));
     if (url === '/api/birds/fact') return Promise.resolve(Response.json({ fact: 'A bird fact.', sources: [] }));
     if (url.includes('info=1')) return Promise.resolve(Response.json({}));
@@ -31,7 +34,7 @@ async function mountBoard(t, fetcher = async (url) => Response.json(url === '/ap
   const root = createRoot(document.getElementById('root'));
   t.after(async () => { await act(() => root.unmount()); assert.equal(source.closed, true); dom.window.close(); });
   await act(() => root.render(<Board version="test" />));
-  return { source, resumed: () => resumed, change: async (element, value) => {
+  return { source, requests, resumed: () => resumed, change: async (element, value) => {
     await act(() => { element.value = value; element.dispatchEvent(new dom.window.Event('change', { bubbles: true })); });
   } };
 }
@@ -207,4 +210,30 @@ test('listening shows elapsed time from real sightings, never from historical re
   await act(() => document.querySelector('#back-to-live').click());
   assert.equal(document.querySelector('section h2').textContent, 'Listening…');
   assert.equal(document.querySelector('.caption p').textContent, 'Last bird sighting was 0 seconds ago');
+});
+
+
+test('a new detection of the same species restarts facts and GIFs, while replayed event IDs do not', async t => {
+  const { source, requests, change } = await mountBoard(t);
+  await act(() => document.querySelector('#randomize').click());
+  await act(() => source.emit('detection', robin));
+  const firstView = document.querySelector('section article');
+  const factCalls = () => requests.filter(call => call.url === '/api/birds/fact');
+  assert.equal(factCalls().length, 1);
+  await act(() => source.emit('detection', { ...robin, id: 43 }));
+  assert.equal(factCalls().length, 2);
+  assert.equal(factCalls()[0].options.signal.aborted, true);
+  assert.notEqual(document.querySelector('section article'), firstView);
+  await act(() => source.emit('detection', { ...robin, id: 43 }));
+  assert.equal(factCalls().length, 2);
+  await change(document.querySelector('#visualization'), 'celebrity-death-match');
+  await act(() => source.emit('detection', { ...robin, id: 44 }));
+  const firstMatch = document.querySelector('.match-gif');
+  const imageCalls = () => requests.filter(call => call.url === '/api/tools');
+  assert.equal(imageCalls().length, 1);
+  assert.equal(JSON.parse(imageCalls()[0].options.body).tool, 'image');
+  await act(() => source.emit('detection', { ...robin, id: 45 }));
+  assert.equal(imageCalls().length, 2);
+  assert.equal(imageCalls()[0].options.signal.aborted, true);
+  assert.notEqual(document.querySelector('.match-gif'), firstMatch);
 });
