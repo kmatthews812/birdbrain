@@ -136,21 +136,21 @@ export default function Board({ version }) {
             </select>
             <label htmlFor="randomize" className="checkbox-label"><input id="randomize" type="checkbox" checked={randomize} onChange={event => setRandomize(event.target.checked)} />Randomize</label>
           </div>
+          <div className="preview-controls">
+            <label htmlFor="past-bird">Previously seen birds</label>
+            <select id="past-bird" value={pastBird} disabled={!seenBirds.length} onChange={event => setPastBird(event.target.value)}>
+              <option value="">Choose a bird…</option>
+              {seenBirds.map(item => <option key={birdKey(item)} value={birdKey(item)}>{item.commonName}</option>)}
+            </select>
+            <button id="show-bird" type="button" disabled={!pastBird} onClick={() => play(seenBirds.find(item => birdKey(item) === pastBird), true)}>Show bird</button>
+            {preview && <><span className="preview-status">Manual preview</span><button id="back-to-live" type="button" onClick={finish}>Back to live</button></>}
+            {historyStatus === 'loading' && <span className="history-status">Loading bird history…</span>}
+            {historyStatus === 'error' && <><span className="history-status">Could not load previously seen birds.</span><button id="retry-history" type="button" onClick={() => setHistoryAttempt(value => value + 1)}>Retry</button></>}
+            {historyStatus === 'ready' && !seenBirds.length && <span className="history-status">No birds recorded yet.</span>}
+          </div>
           <p className="connection"><i data-online={online} />{online ? 'Live' : 'Connecting'}</p>
         </div>
       </header>
-      <div className="preview-controls">
-        <label htmlFor="past-bird">Previously seen birds</label>
-        <select id="past-bird" value={pastBird} disabled={!seenBirds.length} onChange={event => setPastBird(event.target.value)}>
-          <option value="">Choose a bird…</option>
-          {seenBirds.map(item => <option key={birdKey(item)} value={birdKey(item)}>{item.commonName}</option>)}
-        </select>
-        <button id="show-bird" type="button" disabled={!pastBird} onClick={() => play(seenBirds.find(item => birdKey(item) === pastBird), true)}>Show bird</button>
-        {preview && <><span className="preview-status">Manual preview</span><button id="back-to-live" type="button" onClick={finish}>Back to live</button></>}
-        {historyStatus === 'loading' && <span className="history-status">Loading bird history…</span>}
-        {historyStatus === 'error' && <><span className="history-status">Could not load previously seen birds.</span><button id="retry-history" type="button" onClick={() => setHistoryAttempt(value => value + 1)}>Retry</button></>}
-        {historyStatus === 'ready' && !seenBirds.length && <span className="history-status">No birds recorded yet.</span>}
-      </div>
       <div className="display-layout">
         <section aria-live="polite">
           {bird && visualization ? <Player key={sequence} visualization={visualization} bird={bird} previousBird={previousBird} sound={sound} /> : <>

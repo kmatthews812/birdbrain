@@ -44,6 +44,9 @@ test('starts listening with named visualization disabled and Randomize checked',
   const doc = dom.window.document;
   assert.equal(doc.querySelector('h2').textContent, 'Listening…');
   assert.equal(doc.querySelector('h1').textContent, 'BirdBrain');
+  assert.equal(doc.querySelector('header #past-bird')?.id, 'past-bird');
+  assert.equal(doc.querySelector('header #show-bird')?.textContent, 'Show bird');
+  assert.equal(doc.querySelector('main > .preview-controls'), null);
   assert.equal(doc.querySelector('.brand img').getAttribute('src'), '/birdbrain.png');
   assert.equal(doc.querySelector('#visualization')?.disabled, true);
   assert.equal(doc.querySelector('#visualization option')?.textContent, 'Default View');
