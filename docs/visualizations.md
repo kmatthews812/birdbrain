@@ -91,8 +91,11 @@ again. Photo credits travel with the selected image. BirdNET-Go’s cached image
 is the fallback when alternatives cannot be loaded. There is no spending quota; other
 visualizations should cache expensive repeated generation.
 
-Put sound assets in `public/sounds/`. Tap **Enable sound** once after opening or
-reloading the page. `playSound` returns `false` when muted and `true` when playback
+Put sound assets in `public/sounds/`. Tap **Enable sound** in the header once after
+opening or reloading the page (required by browser autoplay rules). Every new live
+detection then plays a short duck quack, including repeated species. Replayed event
+IDs and manual previews do not alert. **Mute sound** stops and disables both alerts
+and visualization audio; **Unmute sound** enables them again. `playSound` returns `false` when muted and `true` when playback
 starts, and rejects if loading fails. External audio URLs need to allow CORS.
 The same audio context is reused after that tap; muting stops active sounds.
 
