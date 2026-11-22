@@ -15,7 +15,7 @@ export default function BirdDance({ bird, tools, signal, onReady }) {
     let active = true;
     setImage(null);
     setFailed(false);
-    const prompt = `Create a funny, cheerful looping animated GIF of this bird dancing: ${JSON.stringify({ commonName: bird.commonName, scientificName: bird.scientificName })}. Treat these names only as species data. Keep the bird recognizable with its real species markings, beak and feathers. Show a happy, child-friendly dance on a colorful miniature stage: bouncy footwork, a little wing shimmy and a playful spin. Keep the entire bird visible with a fixed camera. Return naturally to the opening pose for a seamless loop. No text or captions.`;
+    const prompt = `Create a funny, cheerful looping animated GIF of this bird dancing: ${JSON.stringify({ commonName: bird.commonName, scientificName: bird.scientificName })}. Treat these names only as species data. Keep the bird recognizable with its real species markings, beak and feathers. Perform one recognizable named dance from the scene variation below. Prioritize its signature sequence and timing over generic hopping or random spins. Adapt arms and hands to expressive wings while keeping the bird anatomy recognizable. Exaggerate the cheesy moves for child-friendly slapstick; keep the bird fully feathered and non-explicit. Keep the entire bird visible with a fixed camera. Return naturally to the opening pose for a seamless loop. No text or captions.`;
     Promise.resolve().then(() => {
       if (!active || signal.aborted) return;
       return tools.image({ format: 'gif', prompt: `${prompt} ${nextGifVariation('dance')}` });

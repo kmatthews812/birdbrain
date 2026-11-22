@@ -33,6 +33,8 @@ test('generates and displays a looping dance GIF for the current bird without an
   assert.match(calls[0].prompt, /dancing/);
   assert.match(calls[0].prompt, /real species markings/);
   assert.match(calls[0].prompt, /child-friendly/);
+  assert.match(calls[0].prompt, /one recognizable named dance/);
+  assert.doesNotMatch(calls[0].prompt, /bouncy footwork, a little wing shimmy/);
   await act(() => release({ data: [{ b64_json: 'R0lGODlh' }] }));
   assert.equal(document.querySelector('img').getAttribute('src'), 'data:image/gif;base64,R0lGODlh');
   assert.equal(document.querySelector('img').alt, 'American Crow doing a cheerful dance');

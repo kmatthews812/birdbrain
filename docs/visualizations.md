@@ -18,7 +18,20 @@ The matchup remains visible until another detection or manual selection replaces
 doing a cheerful dance. It needs no previous bird and remains visible until
 another detection or manual selection replaces it. Both GIF visualizations vary
 their stage, choreography, props and colors on each generation, avoiding the
-immediately previous scene.
+immediately previous scene. Bird Dance rotates through 32 named routines with
+signature movement instructions: Twerking, Running Man, Macarena, Meatstick,
+Griddy, Pole dance, Moonwalk, Robot, Carlton, Floss, Gangnam Style, Chicken Dance,
+YMCA, Disco Point, Hammer Shuffle, Cabbage Patch, Sprinkler, Lawnmower, Shopping
+Cart, Worm, Mashed Potato, Twist, Charleston, Hokey Pokey, Bunny Hop, Electric
+Slide, Cha Cha Slide, Cotton Eye Joe, Dougie, Crank That, Dab, and Vogue.
+Moves are adapted to wings and bird anatomy, with full-body framing and playful,
+non-explicit choreography. The pole routine uses a visible pole with spins and
+acrobatics. Cached manual replays retain their existing dance; new generations
+draw from the expanded rotation.
+
+Reference examples: [Justin Jefferson demonstrating the Griddy](https://www.youtube.com/watch?v=TrxR5HMtr-M),
+[Macarena movement guide](https://www.macarena.com/macarena-dance-moves), and
+[Phish Meatstick dance background](https://phish.net/faq/meatstick-dance).
 
 The upper-right selector chooses a specific visualization when **Randomize** is
 unchecked. Randomize is checked by default. Choose a previously seen species and
