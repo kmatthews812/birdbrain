@@ -97,11 +97,22 @@ visualizations should cache expensive repeated generation.
 
 Put sound assets in `public/sounds/`. Tap **Enable sound** in the header once after
 opening or reloading the page (required by browser autoplay rules). Every new live
-detection then plays a short duck quack, including repeated species. Replayed event
+detection then plays a six-second kookaburra laugh, including repeated species. Replayed event
 IDs and manual previews do not alert. **Mute sound** stops and disables both alerts
 and visualization audio; **Unmute sound** enables them again. `playSound` returns `false` when muted and `true` when playback
 starts, and rejects if loading fails. External audio URLs need to allow CORS.
 The same audio context is reused after that tap; muting stops active sounds.
+
+## Viewer activity
+
+OpenAI and photo-provider requests start only from a visible browser’s playback.
+There are no background generation jobs. Hidden tabs and page departure close the
+BirdNET event stream, stop polling and sounds, and abort pending visualization
+requests. Returning to the page resumes listening without generating content for
+missed events. Closing every viewer leaves no visualization requests running;
+provider work already accepted may not stop immediately on cancellation.
+
+The Windows task still checks GitHub every minute for updates, even with no viewers.
 
 ## Lifetimes and errors
 
