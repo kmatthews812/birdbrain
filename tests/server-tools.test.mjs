@@ -83,3 +83,12 @@ test('tool route delegates POST requests to the tool handler', async () => {
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), {error:'Unknown tool.'});
 });
+
+test('accepts LAN origins matching the request Host when Next uses an internal URL', async () => {
+  const incoming = new Request('http://localhost:3000/api/tools', {
+    method:'POST', headers:{Host:'192.168.4.34:3000',Origin:'http://192.168.4.34:3000'}, body:JSON.stringify({tool:'birdnet',input:{path:'/api/v2/health'}}),
+  });
+  const response = await handleToolRequest(incoming, {env:{}, fetch:async () => Response.json({status:'healthy'})});
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {result:{status:'healthy'}});
+});
