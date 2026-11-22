@@ -86,11 +86,15 @@ export default function Board({ version }) {
     const visualization = options.current.randomize
       ? selectVisualization(visualizations, previous.current)
       : visualizations.find(item => item.id === options.current.selectedId);
-    const item = { id: ++nextSequence.current, detection, manual, visualization, previousBird: lastBird.current };
+    const item = { id: ++nextSequence.current, detection, manual, visualization, previousBird: lastBird.current, ready: false };
+    item.onReady = () => {
+      setEntries(current => current.map(entry => entry.id === item.id ? { ...entry, ready: true } : entry));
+      queue.markReady(item);
+    };
     previous.current = visualization?.id;
     lastBird.current = detection;
     setEntries(current => [...current, item]);
-    queue.enqueue(item);
+    queue.enqueue(item, { ready: false });
   }, [queue]);
   useEffect(() => () => queue.clear(), [queue]);
   const finish = useCallback(() => {
@@ -213,13 +217,16 @@ export default function Board({ version }) {
       </header>
       <div className="display-layout">
         <section aria-live="polite">
-          {!watching ? <div className="caption"><h2>Paused</h2><p>BirdBrain resumes when you return to this tab.</p></div> : bird ? entries.map(item => <div key={item.id} data-playback={item.id} hidden={item.id !== activeId}><Player visualization={item.visualization} bird={item.detection} previousBird={item.previousBird} sound={sound} active={item.id === activeId} /></div>) : <>
-            <div className="rings" aria-hidden="true" />
-            <ListeningStatus timestamp={lastSighting} loading={recentStatus === 'loading'} error={recentStatus === 'error'} />
+          {!watching ? <div className="caption"><h2>Paused</h2><p>BirdBrain resumes when you return to this tab.</p></div> : <>
+            {!bird && <>
+              <div className="rings" aria-hidden="true" />
+              <ListeningStatus timestamp={lastSighting} loading={recentStatus === 'loading'} error={recentStatus === 'error'} />
+            </>}
+            {entries.map(item => <div key={item.id} data-playback={item.id} hidden={item.id !== activeId}><Player visualization={item.visualization} bird={item.detection} previousBird={item.previousBird} sound={sound} active={item.id === activeId} onReady={item.onReady} /></div>)}
+            {bird && <NextBird startedAt={startedAt} pending={pendingCount > 0} />}
           </>}
-          {watching && pendingCount > 0 && <NextBird startedAt={startedAt} />}
         </section>
-        {watching && <RecentHistory activeBird={bird} onHistory={onHistory} detection={latestDetection} onSelect={detection => enqueue(detection, true)} />}
+        {watching && <RecentHistory processingBirds={entries.filter(item => !item.ready).map(item => item.detection)} activeBird={bird} onHistory={onHistory} detection={latestDetection} onSelect={detection => enqueue(detection, true)} />}
       </div>
     </main>
   );

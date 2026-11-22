@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import React, { act } from 'react';
+import React, { act, useEffect } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createRoot } from 'react-dom/client';
 import { JSDOM } from 'jsdom';
@@ -39,6 +39,14 @@ async function mountBoard(t, fetcher = async (url) => Response.json(url === '/ap
     return fetcher(url, options);
   });
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: Date.parse('2026-11-22T18:00:00Z') });
+  const loaded = new WeakSet();
+  const observer = new window.MutationObserver(() => {
+    document.querySelectorAll('[data-playback] img').forEach(img => {
+      if (!loaded.has(img)) { loaded.add(img); img.dispatchEvent(new window.Event('load')); }
+    });
+  });
+  observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
+  t.after(() => observer.disconnect());
   const root = createRoot(document.getElementById('root'));
   t.after(async () => { await act(() => root.unmount()); assert.equal(source.closed, true); dom.window.close(); });
   await act(() => root.render(<Board version="test" />));
@@ -89,7 +97,7 @@ test('live detections play credited visualizations once, with sound controls and
 });
 
 test('unchecked Randomize uses the chosen visualization for every event; checking resumes random selection', async (t) => {
-  visualizations.push({ id: 'test-view', name: 'Test View', createdBy: 'Test', Component: ({ bird }) => <h2>Test: {bird.commonName}</h2> });
+  visualizations.push({ id: 'test-view', name: 'Test View', createdBy: 'Test', Component: ({ bird, onReady }) => { useEffect(onReady, [onReady]); return <h2>Test: {bird.commonName}</h2>; } });
   t.after(() => visualizations.pop());
   t.mock.method(Math, 'random', () => 0);
   const { source, change } = await mountBoard(t);
@@ -173,7 +181,7 @@ test('a late history response keeps species received from the live stream', asyn
 
 test('passes the preceding bird to a visualization, ignoring duplicate events and tracking birds during previews', async t => {
   const received = [];
-  visualizations.push({ id: 'pair-test', name: 'Pair test', createdBy: 'Test', Component: props => { received.push(props); return <h2>{props.bird.commonName}</h2>; } });
+  visualizations.push({ id: 'pair-test', name: 'Pair test', createdBy: 'Test', Component: props => { useEffect(props.onReady, [props.onReady]); received.push(props); return <h2>{props.bird.commonName}</h2>; } });
   t.after(() => visualizations.pop());
   const { source, change } = await mountBoard(t);
   await act(() => document.querySelector('#randomize').click());
@@ -205,7 +213,7 @@ test('passes the preceding bird to a visualization, ignoring duplicate events an
 
 test('recent sidebar clicks use the selected visualization and live detections appear during manual playback', async t => {
   const selected = [];
-  visualizations.push({ id: 'sidebar-test', name: 'Sidebar test', createdBy: 'Test', Component: ({ bird }) => { selected.push(bird); return <h2>{bird.commonName}</h2>; } });
+  visualizations.push({ id: 'sidebar-test', name: 'Sidebar test', createdBy: 'Test', Component: ({ bird, onReady }) => { useEffect(onReady, [onReady]); selected.push(bird); return <h2>{bird.commonName}</h2>; } });
   t.after(() => visualizations.pop());
   const { source, change } = await mountBoard(t, undefined, [robin]);
   assert.equal(document.querySelector('section h2').textContent, 'Listening…');
@@ -347,7 +355,7 @@ test('prepares queued views once and reveals them in order without restarting re
   await act(() => source.emit('detection', { ...robin, id: 44 }));
   await act(() => source.emit('detection', { ...robin, id: 44 }));
   assert.equal(document.querySelector('section h2').textContent, 'Robin');
-  assert.equal(document.querySelector('.next-bird').textContent, 'Next bird in 25 seconds');
+  assert.equal(document.querySelector('.next-bird').textContent, '25 seconds remaining');
   assert.equal(facts(), 3);
   const prepared = [...document.querySelectorAll('[data-playback] article')];
   assert.equal(prepared.length, 3);
@@ -357,7 +365,7 @@ test('prepares queued views once and reveals them in order without restarting re
   await act(() => t.mock.timers.tick(1));
   assert.equal(document.querySelector('section h2').textContent, 'Crow');
   assert.equal(document.querySelector('[data-playback]:not([hidden]) article'), prepared[1]);
-  assert.equal(document.querySelector('.next-bird').textContent, 'Next bird in 30 seconds');
+  assert.equal(document.querySelector('.next-bird').textContent, '30 seconds remaining');
   assert.equal(facts(), 3);
   await act(() => t.mock.timers.tick(29999));
   assert.equal(facts(), 3);
@@ -381,11 +389,45 @@ test('highlights the playing sighting while newer queued sightings stack above i
   await act(() => source.emit('detection', next));
   assert.equal(document.querySelector('aside li:first-child [aria-current]'), null);
   assert.equal(document.querySelector('aside [aria-current="true"] .recent-name').textContent, 'Robin');
-  assert.equal(document.querySelector('.next-bird').textContent, 'Next bird in 25 seconds');
+  assert.equal(document.querySelector('.next-bird').textContent, '25 seconds remaining');
   assert.equal(document.querySelector('header .queue-status'), null);
   await act(() => t.mock.timers.tick(24000));
-  assert.equal(document.querySelector('.next-bird').textContent, 'Next bird in 1 second');
+  assert.equal(document.querySelector('.next-bird').textContent, '1 second remaining');
   await act(() => t.mock.timers.tick(1000));
   assert.equal(document.querySelector('aside [aria-current="true"] .recent-name').textContent, 'Crow');
-  assert.equal(document.querySelector('.next-bird'), null);
+  assert.equal(document.querySelector('.next-bird').textContent, '30 seconds remaining');
+});
+
+test('waits for preparation, shows sidebar processing, and gives each ready selection thirty seconds', async t => {
+  const ready = new Map();
+  visualizations.push({ id: 'controlled', name: 'Controlled', createdBy: 'Test', Component: ({ bird, onReady }) => {
+    ready.set(bird.id, onReady);
+    return <h2>{bird.commonName}</h2>;
+  } });
+  t.after(() => visualizations.pop());
+  const { source, change } = await mountBoard(t);
+  await act(() => document.querySelector('#randomize').click());
+  await change(document.querySelector('#visualization'), 'controlled');
+  await act(() => source.emit('detection', robin));
+  assert.equal(document.querySelector('section h2').textContent, 'Listening…');
+  assert.equal(document.querySelectorAll('aside [role="status"]').length, 1);
+  await act(() => t.mock.timers.tick(45000));
+  await act(() => ready.get(42)());
+  assert.equal(document.querySelector('[data-playback]:not([hidden]) h2').textContent, 'Robin');
+  assert.equal(document.querySelector('.next-bird').textContent, '30 seconds remaining');
+  const crow = { ...robin, id: 43, commonName: 'Crow' };
+  await act(() => source.emit('detection', crow));
+  await act(() => t.mock.timers.tick(40000));
+  assert.equal(document.querySelector('[data-playback]:not([hidden]) h2').textContent, 'Robin');
+  assert.equal(document.querySelector('.next-bird').textContent, 'Waiting for the next bird to finish…');
+  await act(() => ready.get(43)());
+  assert.equal(document.querySelector('[data-playback]:not([hidden]) h2').textContent, 'Crow');
+  assert.equal(document.querySelectorAll('aside [role="status"]').length, 0);
+  await act(() => document.querySelector('aside li button').click());
+  await act(() => ready.get(42)());
+  await act(() => t.mock.timers.tick(29999));
+  assert.equal(document.querySelector('[data-playback]:not([hidden]) h2').textContent, 'Crow');
+  await act(() => t.mock.timers.tick(1));
+  assert.equal(document.querySelector('[data-playback]:not([hidden]) h2').textContent, 'Robin');
+  assert.equal(document.querySelector('.next-bird').textContent, '30 seconds remaining');
 });

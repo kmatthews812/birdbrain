@@ -95,3 +95,16 @@ button:disabled { opacity: .5; cursor: default; }
 }
 [data-playback]:not([hidden]) { display: contents; }
 .recent-history button[aria-current="true"] time { color: #36583b; }
+.processing-spinner {
+  display: inline-block;
+  width: .8rem;
+  height: .8rem;
+  margin-left: .5rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: middle;
+  animation: preparing 1s linear infinite;
+}
+@keyframes preparing { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .processing-spinner { animation: none; } }

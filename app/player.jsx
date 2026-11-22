@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createTools } from '../lib/visualization-tools.mjs';
 
-export default function Player({ visualization, bird, previousBird, sound, active = true }) {
+export default function Player({ visualization, bird, previousBird, sound, active = true, onReady }) {
   const isActive = useRef(active);
   isActive.current = active;
   const [session, setSession] = useState(null);
@@ -16,7 +16,7 @@ export default function Player({ visualization, bird, previousBird, sound, activ
   }, [visualization, sound]);
   const Component = visualization.Component;
   return <>
-    {session && <VisualizationBoundary bird={bird} onError={session.cancel}><Component active={active} bird={bird} previousBird={previousBird} tools={session.tools} signal={session.signal} /></VisualizationBoundary>}
+    {session && <VisualizationBoundary bird={bird} onError={() => { session.cancel(); onReady?.(); }}><Component onReady={onReady} active={active} bird={bird} previousBird={previousBird} tools={session.tools} signal={session.signal} /></VisualizationBoundary>}
     <p className="credit">{visualization.name} · Created by {visualization.createdBy}</p>
   </>;
 }

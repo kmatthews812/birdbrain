@@ -29,3 +29,17 @@ test('preparing a hidden view cannot play sound and activating it preserves its 
   assert.equal(await tools.playSound('/sound.mp3'), true);
   assert.deepEqual(played, ['/sound.mp3']);
 });
+
+test('a rendering failure makes the completed fallback ready instead of blocking the queue', async t => {
+  const dom = new JSDOM('<div id="root"></div>');
+  globalThis.window = dom.window; globalThis.document = dom.window.document; globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  t.mock.method(console, 'error', () => {});
+  const root = createRoot(document.getElementById('root'));
+  t.after(async () => { await act(() => root.unmount()); dom.window.close(); });
+  let ready = 0;
+  const visualization = { name: 'Broken', createdBy: 'Test', Component: () => { throw new Error('Broken'); } };
+  await act(() => root.render(<Player visualization={visualization} bird={{ commonName: 'Robin' }} active={false} onReady={() => ready++} />));
+  assert.equal(ready, 1);
+  assert.equal(document.querySelector('h2').textContent, 'Robin');
+  assert.equal(document.querySelector('[role="status"]').textContent, 'This visualization needs a little help. Listening for the next bird.');
+});
