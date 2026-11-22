@@ -76,89 +76,39 @@ test('preserves safe upstream errors and never reveals provider response bodies'
   assert.deepEqual(await response.json(), { error: 'The upstream service could not complete this request.' });
 });
 
-test('shares in-flight work and caches successful facts per species for 24 hours', async () => {
-  let calls = 0;
-  let now = 1000;
-  let release;
-  const gate = new Promise(resolve => { release = resolve; });
-  const handle = createBirdFactHandler({ now: () => now, env: { OPENAI_API_KEY: 'test' }, fetch: async () => {
-    calls++;
-    await gate;
-    return Response.json(result());
-  } });
-  const first = handle(request());
-  const second = handle(request({ ...bird, scientificName: 'CORVUS BRACHYRHYNCHOS' }));
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(calls, 1);
-  release();
-  assert.deepEqual(await (await first).json(), await (await second).json());
-  assert.equal((await handle(request())).status, 200);
-  assert.equal(calls, 1);
-  now += 24 * 60 * 60 * 1000;
-  assert.equal((await handle(request())).status, 200);
-  assert.equal(calls, 2);
-});
-
-test('does not cache transient failures', async () => {
+test('every request for the same species generates a fresh fact, including simultaneous requests', async () => {
   let calls = 0;
   const handle = createBirdFactHandler({ env: { OPENAI_API_KEY: 'test' }, fetch: async () => {
-    calls++;
-    return calls === 1 ? new Response('unavailable', { status: 503 }) : Response.json(result());
+    const number = ++calls;
+    return Response.json(result(`Fact ${number}`));
   } });
-  assert.equal((await handle(request())).status, 502);
-  assert.equal((await handle(request())).status, 200);
-  assert.equal((await handle(request())).status, 200);
-  assert.equal(calls, 2);
+  const responses = await Promise.all([handle(request()), handle(request())]);
+  assert.deepEqual(await Promise.all(responses.map(async response => (await response.json()).fact)), ['Fact 1', 'Fact 2']);
+  assert.equal((await (await handle(request())).json()).fact, 'Fact 3');
+  assert.equal(calls, 3);
 });
 
-test('bounds successful cached species to 256 entries', async () => {
-  let calls = 0;
-  const handle = createBirdFactHandler({ env: { OPENAI_API_KEY: 'test' }, fetch: async () => { calls++; return Response.json(result()); } });
-  for (let i = 0; i < 257; i++) {
-    assert.equal((await handle(request({ ...bird, scientificName: `Species ${i}` }))).status, 200);
-  }
-  await handle(request({ ...bird, scientificName: 'Species 256' }));
-  assert.equal(calls, 257);
-  await handle(request({ ...bird, scientificName: 'Species 0' }));
-  assert.equal(calls, 258);
-});
-
-test('one cancelled subscriber does not cancel a shared fact needed by another', async () => {
-  let upstreamSignal;
-  let release;
-  const handle = createBirdFactHandler({ env: { OPENAI_API_KEY: 'test' }, fetch: async (_url, options) => {
-    upstreamSignal = options.signal;
-    await new Promise(resolve => { release = resolve; });
-    return Response.json(result());
+test('cancelling a fact request aborts only its own generation', async () => {
+  const signals = [];
+  const releases = [];
+  const handle = createBirdFactHandler({ env: { OPENAI_API_KEY: 'test' }, fetch: (_url, options) => {
+    signals.push(options.signal);
+    return new Promise((resolve, reject) => {
+      releases.push(() => resolve(Response.json(result())));
+      options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true });
+    });
   } });
   const controller = new AbortController();
   const first = handle(request(bird, 'http://birdbrain.test:3000', controller.signal));
   const second = handle(request());
   await new Promise(resolve => setImmediate(resolve));
+  assert.equal(signals.length, 2);
   controller.abort();
-  assert.equal(upstreamSignal.aborted, false);
-  assert.equal((await first).status, 499);
-  release();
+  assert.equal(signals[0].aborted, true);
+  assert.equal(signals[1].aborted, false);
+  releases[1]();
+  assert.equal((await first).ok, false);
   assert.equal((await second).status, 200);
-});
-
-test('cancels upstream when its last subscriber leaves and allows a fresh retry', async () => {
-  let calls = 0;
-  let upstreamSignal;
-  const handle = createBirdFactHandler({ env: { OPENAI_API_KEY: 'test' }, fetch: async (_url, options) => {
-    calls++;
-    upstreamSignal = options.signal;
-    if (calls > 1) return Response.json(result());
-    return new Promise((_resolve, reject) => options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true }));
-  } });
-  const controller = new AbortController();
-  const first = handle(request(bird, 'http://birdbrain.test:3000', controller.signal));
-  await new Promise(resolve => setImmediate(resolve));
-  controller.abort();
-  assert.equal(upstreamSignal.aborted, true);
-  assert.equal((await first).status, 499);
-  assert.equal((await handle(request())).status, 200);
-  assert.equal(calls, 2);
 });
 
 test('removes parenthesized Markdown source citations while preserving parenthetical prose and source links', async () => {
